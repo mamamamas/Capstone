@@ -1,37 +1,45 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import React from 'react';
+// import { AppProvider, RealmProvider } from '@realm/react';
+import Main from '../app/main'; // This should be your navigation setup
+import { NavigationContainer } from '@react-navigation/native';
+import ErrorBoundary from './ErrorBoundary';
+// import retrieveUserData from './retrieveUserData';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+const App = () => {
+    const appConfig = {
+        id: "saulus-gneeuag",
+        baseUrl: "https://realm.mongodb.com",
+    };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+    // The linking configuration for deep linking
+    const linking = {
+        prefixes: ['myapp://'], // Add your app's deep link prefixes here
+        config: {
+            screens: {
+                InitialLogin: 'initial-login',
+                AdminLogin: 'admin-login',
+                AdminDashboard: 'admin-dashboard',
+                User: 'user-dashboard',
+                Login: 'login',
+                Registration: 'registration', // Match this with "Registration" route name in Main.js
+                StudentDetails: 'student-details',
+                Add: 'add',
+                StudentHome: 'student-home',
+            },
+        },
+    };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+    return (
+        // <ErrorBoundary>
+        //     <AppProvider id={appConfig.id} baseUrl={appConfig.baseUrl}>
+        //         <RealmProvider>
+        <NavigationContainer linking={linking} independent={true}>
+            <Main />
+        </NavigationContainer>
+        //         </RealmProvider>
+        //     </AppProvider>
+        // </ErrorBoundary>
+    );
+};
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-    </ThemeProvider>
-  );
-}
+export default App;
