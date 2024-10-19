@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, userData } from 'react';
 import { View, BackHandler, ToastAndroid, StyleSheet, Image, Pressable, Text, Modal, FlatList } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -19,7 +19,7 @@ import ServicesScreen from './TabScreens/ServicesScreen';
 import ScheduleScreen from './TabScreens/ScheduleScreen';
 import LogoutScreen from './TabScreens/LogoutScreen';
 import StudentProfileScreen from './StudentProfileScreen';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -33,6 +33,21 @@ const StudentHomeContent = ({ navigation }) => {
     { id: '3', message: 'Reminder: Flu shot clinic tomorrow', date: '10/10/2024', time: '5:28:47 PM', isRead: true },
   ]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [firstName, setFirstName] = useState('Student');
+  useEffect(() => {
+    const fetchUserName = async () => {
+      try {
+        const firstname = await AsyncStorage.getItem('firstname');
+        if (firstname !== null) {
+          setFirstName(firstname);
+        }
+      } catch (error) {
+        console.error('Error fetching user name:', error);
+      }
+    };
+
+    fetchUserName();
+  }, []);
 
   useEffect(() => {
     const backAction = () => {
@@ -114,7 +129,7 @@ const StudentHomeContent = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeText}>Welcome,</Text>
-          <Text style={styles.usernameText}>Student Name</Text>
+          <Text style={styles.usernameText}>{firstName}</Text>
         </View>
         <View style={styles.iconContainer}>
           <Pressable onPress={handleNotificationPress} style={styles.notificationIconContainer}>

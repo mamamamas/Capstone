@@ -10,11 +10,13 @@ const Colors = {
   mblue: '#1AA7EC',
   lblue: '#002D62',
   white: '#fff',
-  lgray:  '#E6E6E3',
+  lgray: '#E6E6E3',
   cobaltblue: '#003163',
   orange: '#ea7202',
   cobaltblueGradient: gradientBlue,
-  lblue:'#0096FF',
+  lblue: '#0096FF',
+  red: 'red',
+  green: 'green',
 };
 
 export default Colors;

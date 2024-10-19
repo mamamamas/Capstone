@@ -17,7 +17,7 @@ const LogoutScreen = ({ navigation }) => {
           return;
         }
 
-        const response = await axios.post('http://192.168.1.2:3000/user/logout', {}, {
+        const response = await axios.post('http://192.168.1.10:3000/user/logout', {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal, TextInput, Dimensions, Platform, Alert, Image } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -106,7 +106,10 @@ export default function Component() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentDateField, setCurrentDateField] = useState(null);
-
+  const [allRequests, setAllRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   useFocusEffect(
     useCallback(() => {
       setModalVisible(false);
@@ -117,8 +120,40 @@ export default function Component() {
       setShowTimePicker(false);
       setSelectedImage(null);
       setCurrentDateField(null);
+      checkUserRole();
     }, [])
   );
+
+  const checkUserRole = async () => {
+    try {
+      const role = await AsyncStorage.getItem('role');
+      setUserRole(role);
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  };
+  const fetchAllRequests = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get('http://192.168.1.10:3000/requests/admin', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAllRequests(response.data);
+    } catch (err) {
+      setError('Failed to fetch requests. Please try again.');
+      console.error('Error fetching requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (allRequestsModalVisible && (userRole === 'admin' || userRole === 'staff')) {
+      fetchAllRequests();
+    }
+  }, [allRequestsModalVisible, userRole]);
 
   const handleSubmit = async () => {
     if (!isFormValid()) {
@@ -255,7 +290,7 @@ export default function Component() {
 
   const openDetailedView = (request) => {
     setAllRequestsModalVisible(false);
-    navigation.navigate('DetailedRequestScreen', { request });
+    navigation.navigate('DetailedRequestScreen', { requestId: request._id });
   };
 
   const onDateChange = (event, selectedDate) => {
@@ -526,14 +561,16 @@ export default function Component() {
         Fabricating information or providing false details can lead to consequences and may impact your credibility and trustworthiness.
       </Text>
 
-      <Pressable
-        style={styles.viewRequestsButton}
-        onPress={() => setAllRequestsModalVisible(true)}
-      >
-        <Text style={styles.viewRequestsButtonText}>
-          View All Requests
-        </Text>
-      </Pressable>
+      {(userRole === 'admin' || userRole === 'staff') && (
+        <Pressable
+          style={styles.viewRequestsButton}
+          onPress={() => setAllRequestsModalVisible(true)}
+        >
+          <Text style={styles.viewRequestsButtonText}>
+            View All Requests
+          </Text>
+        </Pressable>
+      )}
 
       {requestForms.map((form, index) => (
         <View key={index} style={styles.formContainer}>
@@ -567,7 +604,7 @@ export default function Component() {
                   <Pressable style={[styles.modalButton, styles.submitButton]} onPress={handleSubmit}>
                     <Text style={styles.modalButtonText}>Submit</Text>
                   </Pressable>
-                  <Pressable style={[styles.modalButton, styles.cancelButton]} onPress={handleCancel}>
+                  <Pressable style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
                     <Text style={styles.modalButtonText}>Cancel</Text>
                   </Pressable>
                 </View>
@@ -586,34 +623,40 @@ export default function Component() {
         <View style={styles.modalBackground}>
           <View style={styles.allRequestsModalContainer}>
             <Text style={styles.allRequestsModalTitle}>All Requests Forms</Text>
-            <ScrollView style={styles.tableContainer}>
-              <ScrollView horizontal>
-                <View>
-                  <View style={styles.tableHeader}>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Request</Text>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Sender</Text>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.2 }]}>Status</Text>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.2 }]}>Actions</Text>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Handled By</Text>
-                    <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.4 }]}>Feedback</Text>
-                  </View>
-                  {allRequests.map((request, index) => (
-                    <View key={index} style={styles.tableRow}>
-                      <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{request.request}</Text>
-                      <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{request.sender}</Text>
-                      <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.2, color: request.status === 'approved' ? 'green' : request.status === 'denied' ? 'red' : 'orange' }]}>{request.status}</Text>
-                      <View style={[styles.tableCellView, { width: SCREEN_WIDTH * 0.2 }]}>
-                        <Pressable style={styles.viewButton} onPress={() => openDetailedView(request)}>
-                          <Text style={styles.viewButtonText}>View</Text>
-                        </Pressable>
-                      </View>
-                      <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{request.handledBy}</Text>
-                      <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.4 }]}>{request.feedback}</Text>
+            {loading ? (
+              <Text style={styles.loadingText}>Loading...</Text>
+            ) : error ? (
+              <Text style={styles.errorText}>{error}</Text>
+            ) : (
+              <ScrollView style={styles.tableContainer}>
+                <ScrollView horizontal>
+                  <View>
+                    <View style={styles.tableHeader}>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Request</Text>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Sender</Text>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.2 }]}>Status</Text>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.2 }]}>Actions</Text>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.3 }]}>Handled By</Text>
+                      <Text style={[styles.tableHeaderCell, { width: SCREEN_WIDTH * 0.4 }]}>Feedback</Text>
                     </View>
-                  ))}
-                </View>
+                    {allRequests.map((request, index) => (
+                      <View key={index} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{request.formName}</Text>
+                        <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{`${request.sentBy.firstName} ${request.sentBy.lastName}`}</Text>
+                        <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.2, color: request.status === 'approved' ? 'green' : request.status === 'denied' ? 'red' : 'orange' }]}>{request.status}</Text>
+                        <View style={[styles.tableCellView, { width: SCREEN_WIDTH * 0.2 }]}>
+                          <Pressable style={styles.viewButton} onPress={() => openDetailedView(request)}>
+                            <Text style={styles.viewButtonText}>View</Text>
+                          </Pressable>
+                        </View>
+                        <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.3 }]}>{request.handledByDetails.firstName ? `${request.handledByDetails.firstName} ${request.handledByDetails.lastName}` : 'N/A'}</Text>
+                        <Text style={[styles.tableCell, { width: SCREEN_WIDTH * 0.4 }]}>{request.feedback || 'N/A'}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
               </ScrollView>
-            </ScrollView>
+            )}
             <Pressable
               style={styles.closeButton}
               onPress={() => setAllRequestsModalVisible(false)}
@@ -645,6 +688,7 @@ export default function Component() {
     </ScrollView>
   );
 }
+
 
 const styles = StyleSheet.create({
   contentContainer: {

@@ -14,7 +14,7 @@ export default function TelehealthRequests() {
       const token = await AsyncStorage.getItem('accessToken');
       const response = await axios.get('http://192.168.1.10:3000/requests/teleHealth', {
         headers: {
-          'Authorization': `Bearer ${token}` // Add your token here if needed
+          'Authorization': `Bearer ${token}`
         }
       });
       setTelehealthRequests(response.data);
@@ -52,21 +52,25 @@ export default function TelehealthRequests() {
                 <Text style={[styles.headerCell, styles.handledByColumn]}>Handled by</Text>
                 <Text style={[styles.headerCell, styles.feedbackColumn]}>Feedback</Text>
               </View>
-              {telehealthRequests.map((request, index) => (
-                <View key={index} style={[styles.tableRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
-                  <Text style={[styles.cell, styles.requestColumn]}>{request.formName}</Text>
-                  <Text style={[styles.cell, styles.senderColumn]}>{request.userId}</Text>
-                  <Text style={[styles.cell, styles.statusColumn, styles.statusApproved]}>{request.status}</Text>
-                  <View style={[styles.cell, styles.actionColumn]}>
-                    <Pressable style={styles.viewButton} onPress={() => handleViewPress(request)}>
-                      <Text style={styles.viewButtonText}>View</Text>
-                    </Pressable>
+              {telehealthRequests.length === 0 ? (
+                <Text style={styles.emptyMessage}>No telehealth requests found.</Text>
+              ) : (
+                telehealthRequests.map((request, index) => (
+                  <View key={index} style={[styles.tableRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
+                    <Text style={[styles.cell, styles.requestColumn]}>{request.formName}</Text>
+                    <Text style={[styles.cell, styles.senderColumn]}>{request.userId}</Text>
+                    <Text style={[styles.cell, styles.statusColumn, styles.statusApproved]}>{request.status}</Text>
+                    <View style={[styles.cell, styles.actionColumn]}>
+                      <Pressable style={styles.viewButton} onPress={() => handleViewPress(request)}>
+                        <Text style={styles.viewButtonText}>View</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.cell, styles.dateColumn]}>{request.timestamp}</Text>
+                    <Text style={[styles.cell, styles.handledByColumn]}>{request.handledByDetails.firstName ? `${request.handledByDetails.firstName} ${request.handledByDetails.lastName}` : 'N/A'}</Text>
+                    <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback}</Text>
                   </View>
-                  <Text style={[styles.cell, styles.dateColumn]}>{request.timestamp}</Text>
-                  <Text style={[styles.cell, styles.handledByColumn]}>{request.handledBy}</Text>
-                  <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback}</Text>
-                </View>
-              ))}
+                ))
+              )}
             </View>
           </ScrollView>
         )}
@@ -74,6 +78,7 @@ export default function TelehealthRequests() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -150,4 +155,12 @@ const styles = StyleSheet.create({
   dateColumn: { width: 180 },
   handledByColumn: { width: 120 },
   feedbackColumn: { width: 200, flexShrink: 1, flexGrow: 1 },
+  emptyMessage: {
+    fontSize: 18, // Slightly larger than regular text
+    fontWeight: '500', // Medium weight to make it stand out
+    color: '#757575', // Neutral gray color
+    textAlign: 'center', // Center horizontally
+    marginTop: 20, // Add some vertical spacing
+    paddingHorizontal: 10, // Add padding for better readability on small screens
+  },
 });

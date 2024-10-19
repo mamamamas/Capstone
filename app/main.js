@@ -18,6 +18,9 @@ import AppNavigator from '../navigation/AppNavigator'
 import StudentDetails from '../screens/Components/StudentDetails';
 import StudentProfile from '../screens/StudentProfileScreen';
 import DetailedRequestScreen from '../screens/DetailedRequestScreen';
+import AdminProfileScreen from '../screens/AdminProfileScreen';
+import CreateAccount from '../screens/CreateAccountScreen';
+import ManageAccountScreen from '../screens/ManageAccountScreen';
 const Stack = createNativeStackNavigator();
 
 export default function Main() {
@@ -38,7 +41,7 @@ export default function Main() {
                     return;
                 }
 
-                if (storedRole === 'admin' || storedRole === 'Nurse') {
+                if (storedRole === 'admin' || storedRole === 'staff') {
                     setInitialRoute('AdminDasboard');
                 } else {
                     setInitialRoute('StudentHome');
@@ -101,6 +104,9 @@ export default function Main() {
             <Stack.Screen name="StudentDetails" component={StudentDetails} options={{ headerShown: false }} />
             <Stack.Screen name="Add" component={AddScreen} />
             <Stack.Screen name="StudentProfileScreen" component={StudentProfile} options={{ title: 'Student Profile', headerShown: true }} />
+            <Stack.Screen name="AdminProfileScreen" component={AdminProfileScreen} options={{ title: 'AdminProfileScreen', headerShown: true }} />
+            <Stack.Screen name="Create Account" component={CreateAccount} options={{ title: 'Create Account', headerShown: true }} />
+            <Stack.Screen name="Manage Account" component={ManageAccountScreen} options={{ title: 'Manage Account', headerShown: true }} />
             <Stack.Screen
                 name="AdminHome"
                 component={AdminDrawer}

@@ -23,7 +23,7 @@ export default function AdminLoginScreen({ navigation }) {
     //     return Object.keys(errors).length === 0;
     // };
 
-    const storeUserData = async (id, accessToken, role, firstname) => {
+    const storeUserData = async (id, accessToken, role, firstname, username) => {
         try {
             await AsyncStorage.setItem('id', id);
             await AsyncStorage.setItem('accessToken', accessToken);
@@ -42,7 +42,8 @@ export default function AdminLoginScreen({ navigation }) {
             await AsyncStorage.removeItem('googleId');
             await AsyncStorage.removeItem('name');
 
-            const response = await axios.post('http://192.168.1.2:3000/user/login', {
+
+            const response = await axios.post('http://192.168.1.10:3000/user/login', {
                 email,
                 password,
             });
@@ -58,7 +59,7 @@ export default function AdminLoginScreen({ navigation }) {
                 await storeUserData(id, accessToken, role, firstname);
 
                 if (role === 'admin' || role === 'staff') {
-                    navigation.navigate('StudentHome');
+                    navigation.navigate('AdminDasboard');
                 } else if (role === 'user') {
                     navigation.navigate('user');
                 }

@@ -39,51 +39,60 @@ const AdminProfileScreen = () => {
   const navigation = useNavigation();
 
   const handlePressHealthRecords = () => {
-    navigation.navigate('Student Record'); // Navigate to the Student Record Screen
+    navigation.navigate('StudentRecordScreen'); // Navigate to the Student Record Screen
   };
 
   const handlePressCreateAccount = () => {
-    navigation.navigate('CreateAccountScreen'); // Or trigger a modal
+    navigation.navigate('Create Account'); // Or trigger a modal
   };
 
   const handlePressManageStock = () => {
     navigation.navigate('StockScreen'); // Placeholder for Manage Stock screen
   };
 
+  const handlePressManageAccounts = () => {
+    navigation.navigate('Manage Account'); // Navigate to the new Manage Accounts screen
+  };
+
   const pressableStyle = {
-    padding: 5,
+    padding: 10,
     backgroundColor: Colors.cobaltblue,
-    borderRadius: 150, // Increased border radius
-    alignItems: 'center', // Center text horizontally
-    justifyContent: 'center', // Center text vertically
-    flex: 1, // Allow buttons to take equal width
-    marginHorizontal: 5, // Add margin between buttons
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 5,
   };
 
   const pressableTextStyle = {
     color: '#fff',
     textAlign: 'center',
+    fontSize: 14,
+    fontWeight: 'bold',
   };
 
   return (
     <ScrollView contentContainerStyle={{ padding: 10 }}>
       <View>
         {/* Pressables Section */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-          <Pressable onPress={handlePressHealthRecords} style={pressableStyle}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, flexWrap: 'wrap' }}>
+          <Pressable onPress={handlePressHealthRecords} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
             <Text style={pressableTextStyle}>Health Records</Text>
           </Pressable>
 
-          <Pressable onPress={handlePressCreateAccount} style={pressableStyle}>
+          <Pressable onPress={handlePressCreateAccount} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
             <Text style={pressableTextStyle}>Create Account</Text>
           </Pressable>
 
-          <Pressable onPress={handlePressManageStock} style={pressableStyle}>
+          <Pressable onPress={handlePressManageStock} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
             <Text style={pressableTextStyle}>Manage Stock</Text>
+          </Pressable>
+
+          <Pressable onPress={handlePressManageAccounts} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
+            <Text style={pressableTextStyle}>Manage Accounts</Text>
           </Pressable>
         </View>
 
-        {/* Bar Chart Section */}
         <ChartTitle title="Top 5 Major Health Concerns" />
         <BarChart
           data={diseaseData}
@@ -92,7 +101,7 @@ const AdminProfileScreen = () => {
           fromZero={true}
           chartConfig={chartConfig}
           verticalLabelRotation={50}
-          showValuesOnTopOfBars={true} // Show values for better visualization
+          showValuesOnTopOfBars={false}
           style={{
             marginLeft: -10,
             backgroundColor: '#fff',
@@ -102,7 +111,6 @@ const AdminProfileScreen = () => {
           }}
         />
 
-        {/* Pie Chart Section */}
         <ChartTitle title="Health Statistics" />
         <View style={{ backgroundColor: '#fff', borderRadius: 50, paddingVertical: 20, marginVertical: 10 }}>
           <PieChart
@@ -119,7 +127,6 @@ const AdminProfileScreen = () => {
           />
         </View>
 
-        {/* Insights Section */}
         <ChartTitle title="Insights" />
         <InsightSection />
       </View>

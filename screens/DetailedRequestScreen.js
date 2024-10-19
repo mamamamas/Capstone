@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import Colors from '../constants/Colors';
-import Axios from 'axios';
+import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Colors from '../constants/Colors';
+
 export default function DetailedRequestScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const { requestId } = route.params;  // Fetching requestId passed from the previous screen
+  const { requestId } = route.params;
 
   const [request, setRequest] = useState(null);
   const [status, setStatus] = useState(null);
-
+  const [userRole, setUserRole] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [feedback, setFeedback] = useState('');
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
   useEffect(() => {
-    // Fetch request details from backend using requestId
     const fetchRequestDetails = async () => {
       try {
-        const token = await AsyncStorage.getItem('accessToken');  // Adjust if you're storing the token in a different way
+        setLoading(true);
+        const token = await AsyncStorage.getItem('accessToken');
+        const role = await AsyncStorage.getItem('role');
 
-        if (!token) {
-          console.error('No authentication token found');
-          return;
+        if (role !== 'admin' && role !== 'staff') {
+          throw new Error('For Authorized Access');
         }
 
-        const response = await Axios.get(`http://192.168.1.10:3000/requests/${requestId}`, {
+        setUserRole(role);
+
+        const response = await axios.get(`http://192.168.1.10:3000/requests/${requestId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -33,46 +40,68 @@ export default function DetailedRequestScreen() {
         setStatus(response.data.status);
       } catch (error) {
         console.error('Error fetching request:', error.response?.data || error.message);
+        setError('Failed to load request details. Please try again.');
+      } finally {
+        setLoading(false);
       }
     };
     fetchRequestDetails();
   }, [requestId]);
 
-  const handleDecline = async () => {
-    if (status === 'pending') {
-      setStatus('declined');
-      try {
-        await Axios.put(`http://192.168.1.10:3000/requests/decline/${requestId}`, { status: 'declined' });
-      } catch (error) {
-        console.error('Error declining request:', error);
-      }
+  const handleStatusChange = async (newStatus) => {
+    navigation.goBack();
+    if (!feedback.trim()) {
+      Alert.alert('Feedback Required', 'Please provide feedback before changing the status.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.patch(`http://192.168.1.10:3000/requests/${requestId}`,
+        { status: newStatus, feedback },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setRequest(response.data.appointment);
+      setStatus(newStatus);
+      setShowFeedbackInput(false);
+      Alert.alert('Success', `Request ${newStatus} successfully.`);
+    } catch (error) {
+      console.error(`Error ${newStatus} request:`, error);
+      setError(`Failed to ${newStatus} request. Please try again.`);
+      Alert.alert('Error', error.response?.data?.error || `Failed to ${newStatus} request. Please try again.`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleApprove = async () => {
-    if (status === 'pending') {
-      setStatus('approved');
-      try {
-        await Axios.put(`http://192.168.1.10:3000/requests/approve/${requestId}`, { status: 'approved' });
-      } catch (error) {
-        console.error('Error approving request:', error);
-      }
-    }
-  };
 
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  if (!request) {
-    return <Text>Loading...</Text>;  // Show loading message until request data is fetched
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.cobaltblue} />
+      </View>
+    );
   }
 
-  const isPending = status === 'pending';
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={styles.retryButton} onPress={() => navigation.goBack()}>
+          <Text style={styles.retryButtonText}>Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
-      <Pressable style={styles.backButton} onPress={handleBackPress}>
+      <Pressable style={styles.backButton} onPress={handleBackPress} accessibilityLabel="Go back">
         <Ionicons name="arrow-back" size={24} color={Colors.white} />
       </Pressable>
 
@@ -82,35 +111,88 @@ export default function DetailedRequestScreen() {
         <Text style={styles.label}>Consultation Type: <Text style={styles.text}>{request?.appointment?.formName}</Text></Text>
         <Text style={styles.label}>Reason for Appointment: <Text style={styles.text}>{request?.appointment?.reason || 'N/A'}</Text></Text>
         <Text style={styles.label}>Preferred Appointment Date and Time: <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
-        <Text style={styles.label}>Status: <Text style={styles.text}>{request?.appointment?.status || 'N/A'}</Text></Text>
-        <Text style={styles.label}>HandledBy: <Text style={styles.text}>{request?.staffDetails?.firstName} {request?.staffDetails?.lastName || 'Unassigned'}</Text></Text>
+        <Text style={styles.label}>Status: <Text style={[styles.text, styles[status]]}>{request?.appointment?.status || 'N/A'}</Text></Text>
+        <Text style={styles.label}>Handled By: <Text style={styles.text}>{request?.staffDetails?.firstName} {request?.staffDetails?.lastName || 'Unassigned'}</Text></Text>
         <Text style={styles.label}>Feedback: <Text style={styles.text}>{request?.appointment?.feedback || 'No feedback yet'}</Text></Text>
         <Text style={styles.label}>Made When: <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
       </View>
-      <View style={styles.buttonContainer}>
-        <Pressable
-          style={[styles.button, !isPending && styles.disabledButton]}
-          onPress={handleDecline}
-          disabled={!isPending}
-        >
-          <Text style={styles.buttonText}>Decline Request</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.button, !isPending && styles.disabledButton]}
-          onPress={handleApprove}
-          disabled={!isPending}
-        >
-          <Text style={styles.buttonText}>Approve Request</Text>
-        </Pressable>
-      </View>
+      {(userRole === 'admin' || userRole === 'staff') && (
+        <View style={styles.actionContainer}>
+          <View style={styles.buttonContainer}>
+            <Pressable
+              style={[styles.button, styles.declineButton]}
+              onPress={() => setShowFeedbackInput('declined')}
+              accessibilityLabel="Decline Request"
+            >
+              <Text style={styles.buttonText}>Decline</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.button, styles.approveButton]}
+              onPress={() => setShowFeedbackInput('approved')}
+              accessibilityLabel="Approve Request"
+            >
+              <Text style={styles.buttonText}>Approve</Text>
+            </Pressable>
+          </View>
+          {showFeedbackInput && (
+            <>
+              <TextInput
+                style={styles.feedbackInput}
+                placeholder="Enter feedback"
+                value={feedback}
+                onChangeText={setFeedback}
+                multiline
+              />
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => handleStatusChange(showFeedbackInput)}
+                accessibilityLabel="Take Action"
+              >
+                <Text style={styles.actionButtonText}>Take Action</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.lgray,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.lgray,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.lgray,
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: Colors.red,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: Colors.cobaltblue,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   backButton: {
     position: 'absolute',
@@ -156,14 +238,53 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 5,
     alignItems: 'center',
-    backgroundColor: Colors.cobaltblue,
     marginHorizontal: 5,
   },
-  disabledButton: {
-    opacity: 0.5,
+  declineButton: {
+    backgroundColor: Colors.orange,
+  },
+  approveButton: {
+    backgroundColor: Colors.cobaltblue,
   },
   buttonText: {
     color: Colors.white,
     fontWeight: 'bold',
+  },
+  pending: {
+    color: Colors.cobaltblue,
+  },
+  approved: {
+    color: Colors.green,
+  },
+  declined: {
+    color: Colors.red,
+  },
+  actionContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+  },
+  feedbackInput: {
+    backgroundColor: Colors.white,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginTop: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    backgroundColor: Colors.cobaltblue,
+    paddingVertical: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: Colors.white,
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
