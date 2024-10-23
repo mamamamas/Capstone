@@ -14,22 +14,26 @@ export default function DetailedRequestScreen() {
   const [request, setRequest] = useState(null);
   const [status, setStatus] = useState(null);
   const [userRole, setUserRole] = useState("");
+  const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [showFeedbackInput, setShowFeedbackInput] = useState(false);
+
   useEffect(() => {
     const fetchRequestDetails = async () => {
       try {
         setLoading(true);
         const token = await AsyncStorage.getItem('accessToken');
         const role = await AsyncStorage.getItem('role');
+        const id = await AsyncStorage.getItem('id');
 
-        if (role !== 'admin' && role !== 'staff') {
-          throw new Error('For Authorized Access');
-        }
+        // if (role !== 'admin' && role !== 'staff') {
+        //   throw new Error('For Authorized Access');
+        // }
 
         setUserRole(role);
+        setUserId(id);
 
         const response = await axios.get(`http://192.168.1.10:3000/requests/${requestId}`, {
           headers: {
@@ -37,7 +41,7 @@ export default function DetailedRequestScreen() {
           },
         });
         setRequest(response.data);
-        setStatus(response.data.status);
+        setStatus(response.data.appointment.status);
       } catch (error) {
         console.error('Error fetching request:', error.response?.data || error.message);
         setError('Failed to load request details. Please try again.');
@@ -49,7 +53,6 @@ export default function DetailedRequestScreen() {
   }, [requestId]);
 
   const handleStatusChange = async (newStatus) => {
-    navigation.goBack();
     if (!feedback.trim()) {
       Alert.alert('Feedback Required', 'Please provide feedback before changing the status.');
       return;
@@ -62,10 +65,11 @@ export default function DetailedRequestScreen() {
         { status: newStatus, feedback },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setRequest(response.data.appointment);
+      setRequest(response.data);
       setStatus(newStatus);
       setShowFeedbackInput(false);
       Alert.alert('Success', `Request ${newStatus} successfully.`);
+      navigation.goBack();
     } catch (error) {
       console.error(`Error ${newStatus} request:`, error);
       setError(`Failed to ${newStatus} request. Please try again.`);
@@ -74,7 +78,6 @@ export default function DetailedRequestScreen() {
       setLoading(false);
     }
   };
-
 
   const handleBackPress = () => {
     navigation.goBack();
@@ -99,6 +102,45 @@ export default function DetailedRequestScreen() {
     );
   }
 
+  const isOwnRequest = userId === request?.appointment?.userId;
+
+  const getFormSpecificLabels = () => {
+    switch (request?.appointment?.formName) {
+      case 'Appointment Request Form':
+        return {
+          dateTimeLabel: 'Preferred Appointment Date and Time:',
+          reasonLabel: 'Reason for Appointment:',
+        };
+      case 'Medical Leave Form':
+        return {
+          dateTimeLabel: 'Leave Duration:',
+          reasonLabel: 'Reason for Medical Leave:',
+        };
+      case 'Medical Record Request/Release Form':
+        return {
+          dateTimeLabel: 'Request Date:',
+          reasonLabel: 'Purpose of Request:',
+        };
+      case 'Special Leave Form':
+        return {
+          dateTimeLabel: 'Leave Duration:',
+          reasonLabel: 'Reason for Special Leave:',
+        };
+      case 'Telehealth Appointment Request Form':
+        return {
+          dateTimeLabel: 'Preferred Telehealth Appointment Date and Time:',
+          reasonLabel: 'Reason for Telehealth Consultation:',
+        };
+      default:
+        return {
+          dateTimeLabel: 'Date and Time:',
+          reasonLabel: 'Reason:',
+        };
+    }
+  };
+
+  const { dateTimeLabel, reasonLabel } = getFormSpecificLabels();
+
   return (
     <ScrollView style={styles.container}>
       <Pressable style={styles.backButton} onPress={handleBackPress} accessibilityLabel="Go back">
@@ -109,14 +151,14 @@ export default function DetailedRequestScreen() {
       <View style={styles.content}>
         <Text style={styles.label}>Sender: <Text style={styles.text}>{request?.userDetails?.firstName} {request?.userDetails?.lastName}</Text></Text>
         <Text style={styles.label}>Consultation Type: <Text style={styles.text}>{request?.appointment?.formName}</Text></Text>
-        <Text style={styles.label}>Reason for Appointment: <Text style={styles.text}>{request?.appointment?.reason || 'N/A'}</Text></Text>
-        <Text style={styles.label}>Preferred Appointment Date and Time: <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
-        <Text style={styles.label}>Status: <Text style={[styles.text, styles[status]]}>{request?.appointment?.status || 'N/A'}</Text></Text>
+        <Text style={styles.label}>{reasonLabel} <Text style={styles.text}>{request?.appointment?.reason || 'N/A'}</Text></Text>
+        <Text style={styles.label}>{dateTimeLabel} <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
+        <Text style={styles.label}>Status: <Text style={[styles.text, styles[status]]}>{status || 'N/A'}</Text></Text>
         <Text style={styles.label}>Handled By: <Text style={styles.text}>{request?.staffDetails?.firstName} {request?.staffDetails?.lastName || 'Unassigned'}</Text></Text>
         <Text style={styles.label}>Feedback: <Text style={styles.text}>{request?.appointment?.feedback || 'No feedback yet'}</Text></Text>
         <Text style={styles.label}>Made When: <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
       </View>
-      {(userRole === 'admin' || userRole === 'staff') && (
+      {(userRole === 'admin' || (userRole === 'staff' && !isOwnRequest)) && (
         <View style={styles.actionContainer}>
           <View style={styles.buttonContainer}>
             <Pressable
@@ -157,7 +199,6 @@ export default function DetailedRequestScreen() {
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -271,10 +312,6 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     marginTop: 10,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   actionButton: {
     backgroundColor: Colors.cobaltblue,

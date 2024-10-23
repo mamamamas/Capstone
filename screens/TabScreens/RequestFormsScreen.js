@@ -407,7 +407,11 @@ export default function Component() {
               <Text>{formData.time ? formData.time.toLocaleTimeString() : 'Select Time'}</Text>
             </Pressable>
 
-            <Text style={styles.label}>Reason for Appointment:</Text>
+            <Text style={styles.label}>
+              {selectedForm.title === 'Telehealth Appointment Request Form'
+                ? 'Reason for Telehealth Consultation:'
+                : 'Reason for Appointment:'}
+            </Text>
             <TextInput
               style={styles.textInput}
               placeholder="Enter reason for appointment"
@@ -490,6 +494,7 @@ export default function Component() {
                 placeholder="Please specify the reason"
                 value={formData.otherReason}
                 onChangeText={(text) => setFormData({ ...formData, otherReason: text })}
+
               />
             )}
 
@@ -551,7 +556,6 @@ export default function Component() {
         return null;
     }
   };
-
   return (
     <ScrollView contentContainerStyle={styles.contentContainer}>
       <Text style={styles.headerText}>

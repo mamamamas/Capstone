@@ -1,18 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Dimensions } from 'react-native';
 import axios from 'axios';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const screenWidth = Dimensions.get('window').width;
+const screenHeight = Dimensions.get('window').height;
+
 export default function TelehealthRequests() {
   const [telehealthRequests, setTelehealthRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
 
-  // Function to fetch requests from the backend
-  const fetchTelehealthRequests = async () => {
+  const fetchTelehealthRequests = useCallback(async () => {
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get('http://192.168.1.10:3000/requests/teleHealth', {
+      const response = await axios.get('http://192.168.1.10:3000/requests', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -23,15 +27,51 @@ export default function TelehealthRequests() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchTelehealthRequests();
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTelehealthRequests();
+    }, [fetchTelehealthRequests])
+  );
 
   const handleViewPress = (request) => {
     navigation.navigate('DetailedRequestScreen', { requestId: request._id });
   };
+
+  const renderTableHeader = () => (
+    <View style={styles.tableHeader}>
+      <Text style={[styles.headerCell, styles.requestColumn]}>Request</Text>
+      <Text style={[styles.headerCell, styles.senderColumn]}>Sender</Text>
+      <Text style={[styles.headerCell, styles.statusColumn]}>Status</Text>
+      <Text style={[styles.headerCell, styles.actionColumn]}>Actions</Text>
+      <Text style={[styles.headerCell, styles.dateColumn]}>Date</Text>
+      <Text style={[styles.headerCell, styles.handledByColumn]}>Handled by</Text>
+      <Text style={[styles.headerCell, styles.feedbackColumn]}>Feedback</Text>
+    </View>
+  );
+
+  const renderTableRows = () => (
+    telehealthRequests.map((request, index) => (
+      <View key={index} style={[styles.tableRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
+        <Text style={[styles.cell, styles.requestColumn]}>{request.formName}</Text>
+        <Text style={[styles.cell, styles.senderColumn]}>{request.userId}</Text>
+        <Text style={[styles.cell, styles.statusColumn, styles.statusApproved]}>{request.status}</Text>
+        <View style={[styles.cell, styles.actionColumn]}>
+          <Pressable style={styles.viewButton} onPress={() => handleViewPress(request)}>
+            <Text style={styles.viewButtonText}>View</Text>
+          </Pressable>
+        </View>
+        <Text style={[styles.cell, styles.dateColumn]}>{request.timestamp}</Text>
+        <Text style={[styles.cell, styles.handledByColumn]}>
+          {request.handledByDetails && request.handledByDetails.firstName
+            ? `${request.handledByDetails.firstName} ${request.handledByDetails.lastName}`
+            : 'N/A'}
+        </Text>
+        <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback}</Text>
+      </View>
+    ))
+  );
 
   return (
     <View style={styles.container}>
@@ -40,45 +80,24 @@ export default function TelehealthRequests() {
         <Text style={styles.cardTitle}>My Telehealth Requests</Text>
         {loading ? (
           <ActivityIndicator size="large" color="#0000ff" />
+        ) : telehealthRequests.length === 0 ? (
+          <Text style={styles.emptyMessage}>No telehealth requests found.</Text>
         ) : (
-          <ScrollView horizontal>
-            <View>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.headerCell, styles.requestColumn]}>Request</Text>
-                <Text style={[styles.headerCell, styles.senderColumn]}>Sender</Text>
-                <Text style={[styles.headerCell, styles.statusColumn]}>Status</Text>
-                <Text style={[styles.headerCell, styles.actionColumn]}>Actions</Text>
-                <Text style={[styles.headerCell, styles.dateColumn]}>Date</Text>
-                <Text style={[styles.headerCell, styles.handledByColumn]}>Handled by</Text>
-                <Text style={[styles.headerCell, styles.feedbackColumn]}>Feedback</Text>
+          <View style={styles.tableContainer}>
+            <ScrollView horizontal>
+              <View>
+                {renderTableHeader()}
+                <ScrollView style={styles.tableBody}>
+                  {renderTableRows()}
+                </ScrollView>
               </View>
-              {telehealthRequests.length === 0 ? (
-                <Text style={styles.emptyMessage}>No telehealth requests found.</Text>
-              ) : (
-                telehealthRequests.map((request, index) => (
-                  <View key={index} style={[styles.tableRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
-                    <Text style={[styles.cell, styles.requestColumn]}>{request.formName}</Text>
-                    <Text style={[styles.cell, styles.senderColumn]}>{request.userId}</Text>
-                    <Text style={[styles.cell, styles.statusColumn, styles.statusApproved]}>{request.status}</Text>
-                    <View style={[styles.cell, styles.actionColumn]}>
-                      <Pressable style={styles.viewButton} onPress={() => handleViewPress(request)}>
-                        <Text style={styles.viewButtonText}>View</Text>
-                      </Pressable>
-                    </View>
-                    <Text style={[styles.cell, styles.dateColumn]}>{request.timestamp}</Text>
-                    <Text style={[styles.cell, styles.handledByColumn]}>{request.handledByDetails.firstName ? `${request.handledByDetails.firstName} ${request.handledByDetails.lastName}` : 'N/A'}</Text>
-                    <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback}</Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </View>
         )}
       </View>
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -108,11 +127,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#333',
   },
+  tableContainer: {
+    maxHeight: screenHeight * 0.6,
+  },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f5f5f5',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+  },
+  tableBody: {
+    flexGrow: 0,
   },
   headerCell: {
     padding: 12,
@@ -156,11 +181,11 @@ const styles = StyleSheet.create({
   handledByColumn: { width: 120 },
   feedbackColumn: { width: 200, flexShrink: 1, flexGrow: 1 },
   emptyMessage: {
-    fontSize: 18, // Slightly larger than regular text
-    fontWeight: '500', // Medium weight to make it stand out
-    color: '#757575', // Neutral gray color
-    textAlign: 'center', // Center horizontally
-    marginTop: 20, // Add some vertical spacing
-    paddingHorizontal: 10, // Add padding for better readability on small screens
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#757575',
+    textAlign: 'center',
+    marginTop: 20,
+    paddingHorizontal: 10,
   },
 });

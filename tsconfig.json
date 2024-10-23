@@ -6,7 +6,18 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules"
+    ],
+    "types": [
+      "react",
+      "node",
+      "jest",
+      "prop-types",
+      "react-test-renderer"
+    ]
   },
   "include": [
     "**/*.ts",

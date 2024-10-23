@@ -1,7 +1,8 @@
-import React, { useState, useEffect, userData } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, BackHandler, ToastAndroid, StyleSheet, Image, Pressable, Text, Modal, FlatList } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Colors from '../constants/Colors';
 import Banner from '../screens/Components/Banner';
@@ -20,36 +21,27 @@ import ScheduleScreen from './TabScreens/ScheduleScreen';
 import LogoutScreen from './TabScreens/LogoutScreen';
 import StudentProfileScreen from './StudentProfileScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
+const API_URL = 'http://192.168.1.10:3000';
 
 const StudentHomeContent = ({ navigation }) => {
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [backPressCount, setBackPressCount] = useState(0);
-  const [notifications, setNotifications] = useState([
-    { id: '1', message: 'Your telehealth request has been approved!', date: '10/11/2024', time: '3:29:16 PM', isRead: false },
-    { id: '2', message: 'New health tip available: Staying Hydrated', date: '10/11/2024', time: '12:24:28 AM', isRead: false },
-    { id: '3', message: 'Reminder: Flu shot clinic tomorrow', date: '10/10/2024', time: '5:28:47 PM', isRead: true },
-  ]);
+  const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [firstName, setFirstName] = useState('Student');
-  useEffect(() => {
-    const fetchUserName = async () => {
-      try {
-        const firstname = await AsyncStorage.getItem('firstname');
-        if (firstname !== null) {
-          setFirstName(firstname);
-        }
-      } catch (error) {
-        console.error('Error fetching user name:', error);
-      }
-    };
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
+  useEffect(() => {
     fetchUserName();
-  }, []);
+    fetchNotifications();
+    fetchAnnouncements();
 
-  useEffect(() => {
     const backAction = () => {
       if (backPressCount === 0) {
         setBackPressCount(1);
@@ -65,25 +57,58 @@ const StudentHomeContent = ({ navigation }) => {
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
 
-    setAnnouncements([
-      {
-        id: '1',
-        title: 'Free Medical Exams for Students',
-        description: 'The University Health Services is offering free medical check-ups for all students. This includes basic health assessments, blood pressure checks, and more. Walk-ins welcome! Please bring your student ID. Prioritize your health and get your check-up today!',
-        date: '2024-09-04',
-        time: '10:00 AM'
-      },
-      {
-        id: '2',
-        title: 'University Vaccination Drive: Stay Protected, Stay Healthy!',
-        description: 'The University Health Services is organizing a free vaccination campaign to ensure the safety and well-being of our students, staff, and faculty. This is part of our ongoing commitment to a healthy campus community. For any inquiries or additional information, please visit the events page. Let\'s work together to keep our campus safe and healthy. Get vaccinated today!',
-        date: '2024-09-10',
-        time: '09:00 AM'
-      }
-    ]);
-
     return () => backHandler.remove();
   }, [backPressCount]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
+
+  const fetchUserName = async () => {
+    try {
+      const firstname = await AsyncStorage.getItem('firstname');
+      if (firstname !== null) {
+        setFirstName(firstname);
+      }
+    } catch (error) {
+      console.error('Error fetching user name:', error);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(`${API_URL}/notification`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(response.data);
+      setHasUnreadNotifications(response.data.some(notif => !notif.isRead));
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      ToastAndroid.show('Failed to load notifications', ToastAndroid.SHORT);
+      return [];
+    }
+  };
+
+  const fetchAnnouncements = async () => {
+    setIsRefreshing(true);
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(`${API_URL}/admin/posts/all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const sortedAnnouncements = response.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setAnnouncements(sortedAnnouncements);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
+      ToastAndroid.show('Failed to load announcements', ToastAndroid.SHORT);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleCancelExit = () => {
     setShowExitDialog(false);
@@ -93,36 +118,96 @@ const StudentHomeContent = ({ navigation }) => {
     BackHandler.exitApp();
   };
 
-  const handleNotificationPress = () => {
+  const handleNotificationPress = async () => {
     setShowNotifications(true);
+    await fetchNotifications();
   };
 
-  const markNotificationAsRead = (id) => {
-    setNotifications(notifications.map(notif =>
-      notif.id === id ? { ...notif, isRead: true } : notif
-    ));
+  const markNotificationAsRead = async (id) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await axios.post(`${API_URL}/notification/${id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      ToastAndroid.show('Failed to mark notification as read', ToastAndroid.SHORT);
+    }
   };
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+  const deleteAllNotifications = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await axios.delete(`${API_URL}/notification/delete-all`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error deleting all notifications:', error);
+      ToastAndroid.show('Failed to delete all notifications', ToastAndroid.SHORT);
+    }
   };
 
-  const deleteAllNotifications = () => {
-    setNotifications([]);
-  };
+  const handleNotificationItemPress = async (notification) => {
+    try {
+      await markNotificationAsRead(notification._id);
 
-  const hasUnreadNotifications = notifications.some(notif => !notif.isRead);
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(`${API_URL}/notification`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(response.data);
+
+      setShowNotifications(false);
+
+      switch (notification.documentType) {
+        case 'Appointment':
+        case 'Medical Leave Form':
+        case 'Medical Record Request':
+        case 'Special Leave Form':
+        case 'Telehealth':
+          navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
+          break;
+        default:
+          console.warn('Unknown notification type:', notification.documentType);
+          ToastAndroid.show('Unable to open this notification', ToastAndroid.SHORT);
+      }
+    } catch (error) {
+      console.error('Error handling notification press:', error);
+      ToastAndroid.show('Failed to process notification', ToastAndroid.SHORT);
+    }
+  };
 
   const renderNotification = ({ item }) => (
     <Pressable
       style={[styles.notificationItem, item.isRead ? styles.readNotification : styles.unreadNotification]}
-      onPress={() => markNotificationAsRead(item.id)}
+      onPress={() => handleNotificationItemPress(item)}
     >
-      <Text style={styles.notificationText}>{item.message}</Text>
-      <Text style={styles.notificationDate}>{`${item.date}, ${item.time}`}</Text>
+      <Text style={styles.notificationText}>{item.title}</Text>
+      <Text style={styles.notificationDate}>{new Date(item.timestamp).toLocaleString()}</Text>
       {!item.isRead && <View style={styles.unreadDot} />}
     </Pressable>
   );
+
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await axios.post(`${API_URL}/notification/mark-all-read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+
+      ToastAndroid.show('All notifications marked as read', ToastAndroid.SHORT);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      ToastAndroid.show('Failed to mark all notifications as read', ToastAndroid.SHORT);
+    }
+  };
+
+  const handleModalShow = async () => {
+    await fetchNotifications();
+  };
 
   return (
     <View style={styles.container}>
@@ -141,7 +226,12 @@ const StudentHomeContent = ({ navigation }) => {
             />
             {hasUnreadNotifications && <View style={styles.notificationBadge} />}
           </Pressable>
-          <Pressable onPress={() => navigation.navigate('StudentProfileScreen')}>
+          <Pressable
+            onPress={async () => {
+              const userId = await AsyncStorage.getItem('id');
+              navigation.navigate('StudentProfileScreen', { userId });
+            }}
+          >
             <Image
               source={require('../assets/default-profile-pic.png')}
               style={styles.profilePic}
@@ -164,6 +254,11 @@ const StudentHomeContent = ({ navigation }) => {
         onItemPress={(item) => {
           console.log('Viewing announcement:', item);
         }}
+        onRefresh={() => {
+          setIsRefreshing(true);
+          fetchAnnouncements();
+        }}
+        refreshing={isRefreshing}
       />
 
       <ExitDialog
@@ -177,6 +272,7 @@ const StudentHomeContent = ({ navigation }) => {
         transparent={true}
         visible={showNotifications}
         onRequestClose={() => setShowNotifications(false)}
+        onShow={handleModalShow}
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
@@ -198,7 +294,7 @@ const StudentHomeContent = ({ navigation }) => {
             <FlatList
               data={notifications}
               renderItem={renderNotification}
-              keyExtractor={item => item.id}
+              keyExtractor={item => item._id}
               style={styles.notificationList}
             />
             <Pressable

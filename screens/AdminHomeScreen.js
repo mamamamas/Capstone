@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, BackHandler, ToastAndroid, StyleSheet, Image, Pressable, Text, Modal, FlatList } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import Banner from '../screens/Components/Banner';
@@ -24,6 +24,7 @@ export default function AdminHomeScreen() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [firstName, setFirstName] = useState('Admin');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   useEffect(() => {
     fetchUserName();
@@ -48,6 +49,12 @@ export default function AdminHomeScreen() {
     return () => backHandler.remove();
   }, [backPressCount]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
+
   const fetchUserName = async () => {
     try {
       const firstname = await AsyncStorage.getItem('firstname');
@@ -66,11 +73,16 @@ export default function AdminHomeScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(response.data);
+      // Update the hasUnreadNotifications state
+      setHasUnreadNotifications(response.data.some(notif => !notif.isRead));
+      return response.data;
     } catch (error) {
       console.error('Error fetching notifications:', error);
       ToastAndroid.show('Failed to load notifications', ToastAndroid.SHORT);
+      return [];
     }
   };
+
 
   const fetchAnnouncements = async () => {
     try {
@@ -138,8 +150,9 @@ export default function AdminHomeScreen() {
     BackHandler.exitApp();
   };
 
-  const handleNotificationPress = () => {
+  const handleNotificationPress = async () => {
     setShowNotifications(true);
+    await fetchNotifications();
   };
 
   const markNotificationAsRead = async (id) => {
@@ -148,7 +161,7 @@ export default function AdminHomeScreen() {
       await axios.post(`${API_URL}/notification/${id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      fetchNotifications();
+      // Removed fetchNotifications() from here
     } catch (error) {
       console.error('Error marking notification as read:', error);
       ToastAndroid.show('Failed to mark notification as read', ToastAndroid.SHORT);
@@ -171,22 +184,22 @@ export default function AdminHomeScreen() {
   const handleNotificationItemPress = async (notification) => {
     try {
       await markNotificationAsRead(notification._id);
+
+      // Fetch updated notifications
+      const token = await AsyncStorage.getItem('accessToken');
+      const response = await axios.get(`${API_URL}/notification`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(response.data);
+
       setShowNotifications(false);
 
       // Navigate to the appropriate screen based on the notification type
       switch (notification.documentType) {
         case 'Appointment':
-          navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
-          break;
         case 'Medical Leave Form':
-          navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
-          break;
         case 'Medical Record Request':
-          navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
-          break;
         case 'Special Leave Form':
-          navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
-          break;
         case 'Telehealth':
           navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
           break;
@@ -200,7 +213,7 @@ export default function AdminHomeScreen() {
     }
   };
 
-  const hasUnreadNotifications = notifications.some(notif => !notif.isRead);
+
 
   const renderNotification = ({ item }) => (
     <Pressable
@@ -213,8 +226,24 @@ export default function AdminHomeScreen() {
     </Pressable>
   );
 
-  const markAllNotificationsAsRead = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+  const markAllNotificationsAsRead = async () => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      await axios.post(`${API_URL}/notification/mark-all-read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Update the local state to reflect all notifications as read
+      setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
+
+      ToastAndroid.show('All notifications marked as read', ToastAndroid.SHORT);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      ToastAndroid.show('Failed to mark all notifications as read', ToastAndroid.SHORT);
+    }
+  };
+  const handleModalShow = async () => {
+    await fetchNotifications();
   };
 
   return (
@@ -306,6 +335,7 @@ export default function AdminHomeScreen() {
         transparent={true}
         visible={showNotifications}
         onRequestClose={() => setShowNotifications(false)}
+        onShow={handleModalShow}
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
@@ -442,7 +472,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold"
   },
-
   notificationList: {
     width: '100%',
   },

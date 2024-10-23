@@ -6,38 +6,38 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_BASE_URL = 'http://192.168.1.10:3000'; // Replace with your actual API base URL
 
-export default function Component() {
+export default function Component({ route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [profileData, setProfileData] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const { userId } = route.params;
 
 
 
   useEffect(() => {
     fetchProfileData();
-  }, []);
+  }, [userId]);
 
   const fetchProfileData = async () => {
     setLoading(true);
     try {
-      const userId = await AsyncStorage.getItem('id');
       const token = await AsyncStorage.getItem('accessToken');
 
-      if (!userId || !token) {
-        throw new Error('User ID or token not found');
+      if (!token) {
+        throw new Error('Token not found');
       }
-
+      console.log('Making request to:', `${API_BASE_URL}/user/profile/${userId}`);
       const response = await axios.get(`${API_BASE_URL}/user/profile/${userId}`, {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       setProfileData(response.data);
-      setLoading(false);
     } catch (err) {
       console.error('Error fetching profile data:', err);
       setError('Failed to load profile data. Please try again.');
+    } finally {
       setLoading(false);
     }
   };

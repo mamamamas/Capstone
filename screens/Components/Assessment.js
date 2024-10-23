@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TextInput, Pressable, Alert, StyleSheet, TouchableOpacity, Text, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-
+import Colors from '../../constants/Colors';
 export default function AddAssessmentButton({ medicalInfoId, onAssessmentAdded }) {
     const [modalVisible, setModalVisible] = useState(false);
     const [complaints, setComplaints] = useState('');
@@ -40,7 +40,7 @@ export default function AddAssessmentButton({ medicalInfoId, onAssessmentAdded }
 
     return (
         <View>
-            <TouchableOpacity style={styles.button} onPress={() => setModalVisible(true)}>
+            <TouchableOpacity style={styles.addButton} onPress={() => setModalVisible(true)}>
                 <Text style={styles.buttonText}>Add Assessment</Text>
             </TouchableOpacity>
 
@@ -152,5 +152,12 @@ const styles = StyleSheet.create({
     },
     buttonSubmit: {
         backgroundColor: '#34C759',
+    },
+    addButton: {
+        backgroundColor: '#003366',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 4,
+        marginRight: 10,
     },
 });

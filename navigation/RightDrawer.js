@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Animated, Image, ScrollView, Dimensions, TextInput, TouchableWithoutFeedback, Platform } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Animated, Image, ScrollView, Dimensions, TextInput, TouchableWithoutFeedback, Platform, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import * as ImagePicker from 'expo-image-picker';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_URL = 'http://192.168.1.10:3000';
 
 const RightDrawer = ({ children }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -13,41 +17,112 @@ const RightDrawer = ({ children }) => {
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
-    const [newImageUrl, setNewImageUrl] = useState('');
-    const [imageData, setImageData] = useState([
-        {
-            image: "https://act-upload.hoyoverse.com/event-ugc-hoyowiki/2023/12/18/35428890/ac29c347dea5a0269bedd44ef6362e77_3737393203659539351.png?x-oss-process=image%2Fformat%2Cwebp",
-            title: "Sucrose",
-            description: "Sucrose is a 4-star Anemo character in Genshin Impact. She is a talented alchemist who specializes in bio-alchemy and often experiments with different substances. Known for her inquisitive nature and dedication to her research, she serves as the assistant to Albedo, the Chief Alchemist of Mondstadt.",
-        },
-        {
-            image: "https://act-upload.hoyoverse.com/event-ugc-hoyowiki/2024/01/05/35428890/d3ad2227481892e394b1a53cefac09ae_1962524665901751429.png",
-            title: "Xiangling",
-            description: "Xiangling is a 4-star Pyro character in Genshin Impact. She is the Head Chef at the Wanmin Restaurant and runs her restaurant in Liyue. Xiangling is known for her amazing cooking skills and has a passion for discovering new and exciting ingredients.",
-        },
-        {
-            image: "https://act-upload.hoyoverse.com/event-ugc-hoyowiki/2023/12/18/35428890/b6c68d8d858d4d5f9f8393a01580de70_7010774928563025994.png?x-oss-process=image%2Fformat%2Cwebp",
-            title: "Zhongli",
-            description: "Zhongli is a 5-star Geo character and the former Archon of Liyue. Known for his wisdom and knowledge, he now works as a consultant for the Wangsheng Funeral Parlor.",
-        },
-        {
-            image: "https://act-upload.hoyoverse.com/event-ugc-hoyowiki/2023/12/18/35428890/ed08f020d2fca8d1259f0792017faab6_3531173162730536742.png?x-oss-process=image%2Fformat%2Cwebp",
-            title: "Albedo",
-            description: "Albedo is a 5-star Geo character and Chief Alchemist of Mondstadt. A brilliant scientist, he is highly respected for his understanding of alchemy and mysteries of the world.",
-        },
-    ]);
+    const [newImageUri, setNewImageUri] = useState('');
+    const [imageData, setImageData] = useState([]);
+    const [isAdmin, setIsAdmin] = useState(false);
 
-    const addNewItem = () => {
-        if (newTitle && newDescription && newImageUrl) {
-            setImageData([...imageData, {
-                image: newImageUrl,
-                title: newTitle,
-                description: newDescription,
-            }]);
-            setNewTitle('');
-            setNewDescription('');
-            setNewImageUrl('');
-            setIsModalVisible(false);
+    useEffect(() => {
+        fetchUserRole();
+        fetchPosters();
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageData.length);
+        }, 9000);
+
+        return () => clearInterval(interval);
+    }, [imageData]);
+
+    const fetchUserRole = async () => {
+        try {
+            const role = await AsyncStorage.getItem('role');
+            setIsAdmin(role === 'admin');
+        } catch (error) {
+            console.error('Error fetching user role:', error);
+        }
+    };
+
+    const fetchPosters = async () => {
+        try {
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+                throw new Error('No access token found');
+            }
+            const response = await axios.get(`${API_URL}/poster`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            setImageData(response.data);
+        } catch (error) {
+            console.error('Error fetching posters:', error);
+            if (error.response && error.response.status === 401) {
+                Alert.alert('Authentication Error', 'Please log in again.');
+            } else {
+                Alert.alert('Error', 'Failed to fetch posters');
+            }
+        }
+    };
+
+    const addNewItem = async () => {
+        if (newTitle && newDescription && newImageUri) {
+            try {
+                const token = await AsyncStorage.getItem('accessToken');
+                if (!token) {
+                    throw new Error('No access token found');
+                }
+                const formData = new FormData();
+                formData.append('title', newTitle);
+                formData.append('body', newDescription);
+                formData.append('image', {
+                    uri: newImageUri,
+                    type: 'image/jpeg',
+                    name: 'poster.jpg',
+                });
+
+                const response = await axios.post(`${API_URL}/poster`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+
+                setImageData([...imageData, response.data]);
+                setNewTitle('');
+                setNewDescription('');
+                setNewImageUri('');
+                setIsModalVisible(false);
+            } catch (error) {
+                console.error('Error adding new poster:', error);
+                if (error.response && error.response.status === 401) {
+                    Alert.alert('Authentication Error', 'Please log in again.');
+                } else {
+                    Alert.alert('Error', 'Failed to add new poster');
+                }
+            }
+        }
+    };
+
+    const deletePoster = async (posterId) => {
+        try {
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+                throw new Error('No access token found');
+            }
+            await axios.delete(`${API_URL}/poster/${posterId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            setImageData(imageData.filter(item => item._id !== posterId));
+        } catch (error) {
+            console.error('Error deleting poster:', error);
+            if (error.response && error.response.status === 401) {
+                Alert.alert('Authentication Error', 'Please log in again.');
+            } else {
+                Alert.alert('Error', 'Failed to delete poster');
+            }
         }
     };
 
@@ -72,24 +147,16 @@ const RightDrawer = ({ children }) => {
         ],
     };
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setCurrentImageIndex((prevIndex) => (prevIndex + 1) % imageData.length);
-        }, 9000);
-
-        return () => clearInterval(interval);
-    }, [imageData]);
-
     const pickImage = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
-            aspect: [4, 3],
+            aspect: [3, 4],
             quality: 1,
         });
 
         if (!result.canceled) {
-            setNewImageUrl(result.assets[0].uri);
+            setNewImageUri(result.assets[0].uri);
         }
     };
 
@@ -108,20 +175,29 @@ const RightDrawer = ({ children }) => {
 
             <Animated.View style={[styles.drawer, drawerStyle]}>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    <View style={styles.profileSection}>
-                        <Image
-                            source={{ uri: imageData[currentImageIndex].image }}
-                            style={styles.posterImage}
-                        />
-                        <Text style={styles.title}>{imageData[currentImageIndex].title}</Text>
-                        <Text style={styles.profileDescription}>
-                            {imageData[currentImageIndex].description}
-                        </Text>
+                    {imageData.map((item, index) => (
+                        <View key={item._id} style={styles.profileSection}>
+                            <Image
+                                source={{ uri: item.posterUrl }}
+                                style={styles.posterImage}
+                                resizeMode="cover"
+                            />
+                            <Text style={styles.title}>{item.title}</Text>
+                            <Text style={styles.profileDescription}>
+                                {item.body}
+                            </Text>
+                            {isAdmin && (
+                                <TouchableOpacity style={styles.deleteButton} onPress={() => deletePoster(item._id)}>
+                                    <Text style={styles.deleteButtonText}>Delete</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    ))}
+                    {isAdmin && (
                         <TouchableOpacity style={styles.addButton} onPress={() => setIsModalVisible(true)}>
-                            <Text style={styles.addButtonText}>Add</Text>
+                            <Text style={styles.addButtonText}>Add New Poster</Text>
                         </TouchableOpacity>
-                    </View>
-                    <View style={styles.divider} />
+                    )}
                 </ScrollView>
             </Animated.View>
 
@@ -133,7 +209,7 @@ const RightDrawer = ({ children }) => {
             >
                 <View style={styles.modalBackground}>
                     <View style={styles.modalContainer}>
-                        <Text style={styles.modalTitle}>Add New Item</Text>
+                        <Text style={styles.modalTitle}>Add New Poster</Text>
                         <TextInput
                             style={styles.input}
                             placeholder="Title"
@@ -149,16 +225,16 @@ const RightDrawer = ({ children }) => {
                             numberOfLines={4}
                         />
                         <View style={styles.imageInputContainer}>
-                            <TextInput
-                                style={[styles.input, styles.imageUrlInput]}
-                                placeholder="Image URL"
-                                value={newImageUrl}
-                                onChangeText={setNewImageUrl}
-                            />
                             <TouchableOpacity style={styles.pickImageButton} onPress={pickImage}>
                                 <Ionicons name="image-outline" size={24} color="#fff" />
+                                <Text style={styles.pickImageText}>
+                                    {newImageUri ? 'Change Image' : 'Choose Image'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
+                        {newImageUri && (
+                            <Image source={{ uri: newImageUri }} style={styles.imagePreview} resizeMode="cover" />
+                        )}
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity style={[styles.modalButton, styles.submitButton]} onPress={addNewItem}>
                                 <Text style={styles.buttonText}>Submit</Text>
@@ -220,7 +296,7 @@ const styles = StyleSheet.create({
     },
     posterImage: {
         width: '100%',
-        height: 180,
+        height: 400,
         borderRadius: 10,
         marginBottom: 10,
     },
@@ -235,11 +311,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 10,
     },
-    divider: {
-        height: 1,
-        backgroundColor: '#e0e0e0',
-        marginVertical: 10,
-    },
     addButton: {
         backgroundColor: Colors.cobaltblue,
         padding: 10,
@@ -247,11 +318,23 @@ const styles = StyleSheet.create({
         marginTop: 15,
         marginBottom: 10,
         alignItems: 'center',
-        width: '30%',
+        alignSelf: 'center',
+        width: '50%',
     },
     addButtonText: {
         color: '#fff',
         fontSize: 16,
+        fontWeight: 'bold',
+    },
+    deleteButton: {
+        backgroundColor: '#ff6347',
+        padding: 8,
+        borderRadius: 15,
+        marginTop: 10,
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontSize: 14,
         fontWeight: 'bold',
     },
     modalBackground: {
@@ -288,15 +371,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 15,
     },
-    imageUrlInput: {
-        flex: 1,
-        marginRight: 10,
-    },
     pickImageButton: {
         backgroundColor: Colors.cobaltblue,
         padding: 10,
-        borderRadius: 50,
-
+        borderRadius: 5,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    pickImageText: {
+        color: '#fff',
+        marginLeft: 10,
+    },
+    imagePreview: {
+        width: 200,
+        height: 267,
+        marginBottom: 15,
+        borderRadius: 5,
     },
     buttonContainer: {
         flexDirection: 'row',
@@ -306,7 +396,7 @@ const styles = StyleSheet.create({
     modalButton: {
         flex: 1,
         padding: 10,
-        borderRadius: 50,
+        borderRadius: 5,
         alignItems: 'center',
         marginHorizontal: 5,
     },

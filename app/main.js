@@ -101,7 +101,7 @@ export default function Main() {
             <Stack.Screen name="user" component={DashboardScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="registration" component={RegisterScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="StudentDetails" component={StudentDetails} options={{ headerShown: false }} />
+            <Stack.Screen name="StudentDetails" component={StudentDetails} options={{ headerShown: true }} />
             <Stack.Screen name="Add" component={AddScreen} />
             <Stack.Screen name="StudentProfileScreen" component={StudentProfile} options={{ title: 'Student Profile', headerShown: true }} />
             <Stack.Screen name="AdminProfileScreen" component={AdminProfileScreen} options={{ title: 'AdminProfileScreen', headerShown: true }} />

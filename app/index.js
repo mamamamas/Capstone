@@ -61,7 +61,7 @@ export default function AdminLoginScreen({ navigation }) {
                 if (role === 'admin' || role === 'staff') {
                     navigation.navigate('AdminDasboard');
                 } else if (role === 'user') {
-                    navigation.navigate('user');
+                    navigation.navigate('StudentHome');
                 }
 
                 setEmail('');

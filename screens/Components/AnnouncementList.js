@@ -10,7 +10,7 @@ const API = 'http://192.168.1.10:3000';
 
 export default function AnnouncementList() {
   const [announcements, setAnnouncements] = useState([]);
-  const [isStudent, setIsStudent] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -27,15 +27,15 @@ export default function AnnouncementList() {
     try {
       const role = await AsyncStorage.getItem('role');
       console.log('User role:', role);
-      setIsStudent(role === 'student'); // Set true only if the role is 'student'
+      setIsAdmin(role === 'admin'); // Set true only if the role is 'admin'
     } catch (error) {
       console.error('Error fetching user role:', error);
     }
   };
 
   useEffect(() => {
-    console.log('isStudent:', isStudent);
-  }, [isStudent]);
+    console.log('isAdmin:', isAdmin);
+  }, [isAdmin]);
 
   const fetchAnnouncements = async () => {
     setIsLoading(true);
@@ -127,18 +127,16 @@ export default function AnnouncementList() {
           Posted {moment(item.createdAt).fromNow()}
         </Text>
       </View>
-      {true && (
+      {isAdmin && (
         <View style={styles.buttonContainer}>
-          <Pressable style={[styles.button, { backgroundColor: Colors.green, }]} onPress={() => handleEditPress(item)}>
-            <Text style={[styles.buttonText, { color: 'white' }]}>Edit</Text>
+          <Pressable style={[styles.button, styles.editButton]} onPress={() => handleEditPress(item)}>
+            <Text style={styles.buttonText}>Edit</Text>
           </Pressable>
-          <Pressable style={[styles.button, { backgroundColor: 'red' }]} onPress={() => handleDeletePress(item)}>
-            <Text style={[styles.buttonText, { color: 'white' }]}>Delete</Text>
+          <Pressable style={[styles.button, styles.deleteButton]} onPress={() => handleDeletePress(item)}>
+            <Text style={styles.buttonText}>Delete</Text>
           </Pressable>
-
         </View>
       )}
-
     </View>
   );
 
@@ -146,7 +144,7 @@ export default function AnnouncementList() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Announcements</Text>
-        {!isStudent && (
+        {isAdmin && (
           <Pressable style={styles.addButton} onPress={handleAddPress}>
             <Text style={styles.addButtonText}>Add</Text>
           </Pressable>
