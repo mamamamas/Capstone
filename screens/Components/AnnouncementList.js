@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment';
 import FormModal from './FormModal';
 
-const API = 'http://192.168.1.10:3000';
+const API = 'http://192.168.1.9:3000';
 
 export default function AnnouncementList() {
   const [announcements, setAnnouncements] = useState([]);

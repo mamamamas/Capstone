@@ -21,6 +21,7 @@ import DetailedRequestScreen from '../screens/DetailedRequestScreen';
 import AdminProfileScreen from '../screens/AdminProfileScreen';
 import CreateAccount from '../screens/CreateAccountScreen';
 import ManageAccountScreen from '../screens/ManageAccountScreen';
+import AnnouncementList from '@/screens/Components/AnnouncementList';
 const Stack = createNativeStackNavigator();
 
 export default function Main() {
@@ -107,6 +108,7 @@ export default function Main() {
             <Stack.Screen name="AdminProfileScreen" component={AdminProfileScreen} options={{ title: 'AdminProfileScreen', headerShown: true }} />
             <Stack.Screen name="Create Account" component={CreateAccount} options={{ title: 'Create Account', headerShown: true }} />
             <Stack.Screen name="Manage Account" component={ManageAccountScreen} options={{ title: 'Manage Account', headerShown: true }} />
+            <Stack.Screen name="AnnouncementList" component={AnnouncementList} options={{ title: 'AnnouncementList', headerShown: true }} />
             <Stack.Screen
                 name="AdminHome"
                 component={AdminDrawer}

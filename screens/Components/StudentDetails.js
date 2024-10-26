@@ -60,8 +60,6 @@ const Table = ({ headers, data, onEdit, isFollowUp }) => {
 };
 
 const TableRow = ({ data, onEdit, isFollowUp }) => {
-
-
     // Check if data is undefined or not an array
     if (!data || !Array.isArray(data)) {
         console.error('Invalid data prop passed to TableRow:', data);
@@ -76,7 +74,7 @@ const TableRow = ({ data, onEdit, isFollowUp }) => {
                 </Text>
             ))}
             <View style={[styles.actionContainer, styles.actionColumn]}>
-                <Pressable onPress={onEdit} style={styles.iconButton}>
+                <Pressable onPress={() => onEdit(data)} style={styles.iconButton}>
                     <Ionicons name="pencil" size={18} color={Colors.primary} />
                 </Pressable>
             </View>
@@ -88,11 +86,13 @@ const AddEditModal = ({ visible, onClose, onSave, title, fields, initialValues =
     const [values, setValues] = useState(initialValues);
     const [isDirty, setIsDirty] = useState(false);
 
+    // Only update values when the modal becomes visible
     useEffect(() => {
-        if (!isDirty) {
+        if (visible) {
             setValues(initialValues);
+            setIsDirty(false);
         }
-    }, [initialValues, isDirty]);
+    }, [visible]); // Dependency only on `visible`
 
     const handleChange = (key, text) => {
         setValues(prevValues => ({ ...prevValues, [key]: text }));
@@ -107,7 +107,6 @@ const AddEditModal = ({ visible, onClose, onSave, title, fields, initialValues =
 
     const handleClose = () => {
         if (isDirty) {
-            // You might want to show a confirmation dialog here
             console.warn('Unsaved changes will be lost');
         }
         setIsDirty(false);
@@ -378,7 +377,7 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
 };
 
 export default function StudentDetailsScreen({ route }) {
-    const { userId, assessmentId } = route.params;
+    const { userId } = route.params;
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -393,6 +392,8 @@ export default function StudentDetailsScreen({ route }) {
     const [newAssessment, setNewAssessment] = useState(null);
     const [editingAssessment, setEditingAssessment] = useState(null);
     const [isEditAssessmentModalVisible, setIsEditAssessmentModalVisible] = useState(false);
+    const [shouldRefreshFollowUps, setShouldRefreshFollowUps] = useState(false);
+    const [assessmentId, setAssessmentId] = useState(null);
     useEffect(() => {
         fetchUserDetails();
     }, [userId]);
@@ -400,10 +401,11 @@ export default function StudentDetailsScreen({ route }) {
 
 
 
+
     const fetchUserDetails = async () => {
         const token = await AsyncStorage.getItem('accessToken');
         try {
-            const response = await axios.get(`http://192.168.1.10:3000/user/${userId}`, {
+            const response = await axios.get(`http://192.168.1.9:3000/user/profile/${userId}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -420,12 +422,11 @@ export default function StudentDetailsScreen({ route }) {
     const fetchArchiveData = async () => {
         const token = await AsyncStorage.getItem('accessToken');
         try {
-            const response = await axios.get(`http://192.168.1.10:3000/archive/${userId}/assessment`, {
+            const response = await axios.get(`http://192.168.1.9:3000/archive/${userId}/assessment`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
-
 
 
             setArchiveData(response.data);
@@ -463,11 +464,14 @@ export default function StudentDetailsScreen({ route }) {
 
     const handleEditAssessment = (index) => {
         const selectedAssessment = userData.assessment[index];
+        const followUpAssessment = selectedAssessment.followUps; // Access follow-ups from the selected assessment
         console.log('Selected Assessment:', selectedAssessment);
+        console.log('Selected FollowUp Assessment:', followUpAssessment);
         setEditingAssessment(selectedAssessment);
         setIsEditAssessmentModalVisible(true);
         setIsAddAssessmentModalVisible(false);
     };
+
 
 
     const handleSaveAssessment = async (newAssessment) => {
@@ -477,7 +481,7 @@ export default function StudentDetailsScreen({ route }) {
             if (editingAssessment) {
                 const { medicalInfoId, originalDocument, ...updateData } = newAssessment;
                 response = await axios.patch(
-                    `http://192.168.1.10:3000/medical/assessment/${editingAssessment._id}`,
+                    `http://192.168.1.9:3000/medical/assessment/${editingAssessment._id}`,
                     updateData,
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -493,8 +497,9 @@ export default function StudentDetailsScreen({ route }) {
                     throw new Error('Unexpected response status');
                 }
             } else {
+                // Create new assessment
                 response = await axios.post(
-                    `http://192.168.1.10:3000/medical/assessment`,
+                    `http://192.168.1.9:3000/medical/assessment`,
                     {
                         ...newAssessment,
                         medicalInfoId: userData.assessment[0]?.medicalInfoId || userData.medicalInfo._id
@@ -503,11 +508,21 @@ export default function StudentDetailsScreen({ route }) {
                 );
 
                 if (response.status === 201 || response.status === 200) {
+                    const createdAssessment = response.data;
+
                     setUserData(prevData => ({
                         ...prevData,
-                        assessment: [...prevData.assessment, response.data]
+                        assessment: [...prevData.assessment, createdAssessment]
                     }));
-                    console.log('New assessment added successfully');
+
+                    // Automatically create an empty follow-up row after assessment is added
+                    await axios.post(
+                        `http://192.168.1.9:3000/medical/assessment/${createdAssessment._id}/followup`,
+                        { followUpComplaints: "", followUpActions: "", date: "" },
+                        { headers: { Authorization: `Bearer ${token}` } }
+                    );
+
+                    console.log('New assessment and follow-up added successfully');
                 } else {
                     throw new Error('Unexpected response status');
                 }
@@ -521,7 +536,6 @@ export default function StudentDetailsScreen({ route }) {
         }
     };
 
-
     if (loading) {
         return <View><Text>Loading...</Text></View>;
     }
@@ -529,96 +543,185 @@ export default function StudentDetailsScreen({ route }) {
     if (error) {
         return <View><Text>Error: {error}</Text></View>;
     }
+
     const handleSaveFollowUp = async (newFollowUp) => {
-        const token = await AsyncStorage.getItem('accessToken');
+        if (!assessmentId && !editingItem) {
+            Alert.alert('Error', 'No assessment selected for new follow-up.');
+            return;
+        }
+
         try {
-            let response;
-            if (editingItem !== null) {
-                // Editing existing follow-up
-                response = await axios.put(
-                    `http://192.168.1.10:3000/assessment/${userData.assessment[0]._id}/followup/${userData.followUps[editingItem]._id}`,
-                    newFollowUp,
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }
-                );
-                console.log()
-                setUserData(prevData => ({
-                    ...prevData,
-                    followUps: prevData.followUps.map((item, index) =>
-                        index === editingItem ? response.data : item
-                    )
-                }));
-            } else {
-                // Adding new follow-up
-                response = await axios.post(
-                    `http://192.168.1.10:3000/assessment/${userData.assessment[0]._id}/followup`,
-                    newFollowUp,
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    }
-                );
-                setUserData(prevData => ({
-                    ...prevData,
-                    followUps: [...(prevData.followUps || []), response.data]
-                }));
-            }
-            setEditingItem(null);
+            const token = await AsyncStorage.getItem('accessToken');
+            const url = assessmentId
+                ? `http://192.168.1.9:3000/medical/assessment/${assessmentId}/followup`
+                : `http://192.168.1.9:3000/medical/assessment/${userData.assessment[0]._id}/followup`;
+
+            const response = await axios.patch(
+                url,
+                newFollowUp,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const updatedAssessment = response.data.updatedAssessment;
+
+            setUserData(prevUserData => ({
+                ...prevUserData,
+                assessment: prevUserData.assessment.map(assessment =>
+                    assessment._id === updatedAssessment._id ? updatedAssessment : assessment
+                )
+            }));
+
             setIsAddFollowUpModalVisible(false);
+            setEditingItem(null);
+            setAssessmentId(null);
+            Alert.alert('Success', 'Follow-up saved successfully.', [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        fetchUserDetails(); // Refresh user data and assessments
+                    },
+                },
+            ]);
         } catch (error) {
             console.error('Error saving follow-up:', error);
-            Alert.alert('Error', 'Failed to save follow-up');
+            if (error.response) {
+                Alert.alert('Error', `Failed to save follow-up: ${error.response.data.error || 'Server error'}`);
+            } else if (error.request) {
+                Alert.alert('Error', 'No response from server. Please check your network connection.');
+            } else {
+                Alert.alert('Error', `Unexpected error: ${error.message}`);
+            }
         }
     };
 
     const handleSaveImmunization = async (newImmunization) => {
         const token = await AsyncStorage.getItem('accessToken');
+        if (!token) {
+            Alert.alert('Error', 'You must be logged in to perform this action.');
+            return;
+        }
+
         try {
             let response;
+            const baseUrl = 'http://192.168.1.9:3000/medical';
+
             if (editingItem !== null) {
-                response = await axios.put(`http://192.168.1.10:3000/immunization/${userData.immunization[editingItem]._id}`, newImmunization, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+                // Access the immunization ID directly from editingItem
+                const immunizationId = editingItem._id;
+                const { medicalInfoId, ...updateData } = newImmunization;
+
+                console.log("Immunization ID:", immunizationId); // Log the immunization ID
+
+                response = await axios.patch(
+                    `${baseUrl}/immunization/${immunizationId}`,
+                    updateData,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                // Update state with the edited immunization
                 setUserData(prevData => ({
                     ...prevData,
-                    immunization: prevData.immunization.map((item, index) =>
-                        index === editingItem ? response.data : item
+                    immunization: prevData.immunization.map((item) =>
+                        item._id === immunizationId ? response.data : item // Compare by _id instead of index
                     )
                 }));
             } else {
-                response = await axios.post(`http://192.168.1.10:3000/immunization`, {
-                    ...newImmunization,
-                    medicalInfoId: userData.immunization[0].medicalInfoId
-                }, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+                response = await axios.post(
+                    `${baseUrl}/immunization`,
+                    {
+                        ...newImmunization,
+                        medicalInfoId: userData.assessment[0]?.medicalInfoId || userData.medicalInfo._id
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                // Add new immunization to state
                 setUserData(prevData => ({
                     ...prevData,
                     immunization: [...prevData.immunization, response.data]
                 }));
             }
+
             setEditingItem(null);
             setIsAddImmunizationModalVisible(false);
         } catch (error) {
-            console.error('Error saving immunization:', error);
-            Alert.alert('Error', 'Failed to save immunization');
+            console.error('Error saving immunization:', error.response?.data || error.message);
+            Alert.alert('Error', `Failed to save immunization: ${error.response?.data?.error || error.message}`);
         }
     };
 
+
     const handleEdit = (type, index) => {
-        setEditingItem(index);
+        // Log the data and index for debugging
+        const assessments = userData.assessment;
+        const immunizations = userData.immunization; // Assuming this is where your immunization data is stored
+
+        console.log("Assessments:", assessments);
+        console.log("Immunizations:", immunizations);
+        console.log("Index passed:", index);
+
+        // Handle the immunization case
+        if (type === "Immunizations Administered") {
+            // Check if the index is valid
+            if (immunizations && index >= 0 && index < immunizations.length) {
+                const immunization = immunizations[index];
+
+                // Ensure the immunization exists
+                if (immunization) {
+                    console.log("Selected Immunization:", immunization);
+                    setEditingItem(immunization); // Set the selected immunization for editing
+                    setIsAddImmunizationModalVisible(true);
+                } else {
+                    console.error("Immunization not found at the provided index.");
+                }
+            } else {
+                console.error("Immunization index out of range.");
+            }
+            return; // Return early to avoid running the assessment logic
+        }
+
+        // Existing logic for handling assessments
+        if (assessments && index >= 0 && index < assessments.length) {
+            const assessment = assessments[index];
+            const followUp = assessment.followUps;
+
+            console.log("Selected Assessment: ", assessment);
+            console.log("Editing Follow-Up: ", followUp);
+
+            setAssessmentId(assessment._id); // This is where the error may occur if assessment is undefined
+
+            if (followUp) {
+                setEditingItem({
+                    followUpComplaints: followUp.followUpComplaints,
+                    followUpActions: followUp.followUpActions,
+                });
+            } else {
+                console.error("No follow-up data found.");
+            }
+
+            setIsAddFollowUpModalVisible(true);
+        } else {
+            console.error("Assessment index out of range.");
+        }
+
+
+        // Open the correct modal based on the type
         switch (type) {
-            // case "Assessment":
-            //     setIsAddAssessmentModalVisible(true);
-            //     break;
             case "Follow-Up":
                 setIsAddFollowUpModalVisible(true);
                 break;
             case "Immunizations Administered":
                 setIsAddImmunizationModalVisible(true);
                 break;
+            default:
+                console.error("Unknown type:", type);
+                break;
         }
     };
+
+
+
+
 
 
     const handleSaveProfile = async (updatedStudent) => {
@@ -842,30 +945,42 @@ export default function StudentDetailsScreen({ route }) {
                     initialValues={editingAssessment || {}}
                 />
 
-                <SectionCard title="Follow-Up" onAdd={handleAddFollowUp} isFollowUp={true}>
+                <SectionCard title="Follow-Up" onAdd={handleAddFollowUp} isFollowUp={true} assessmentId={assessmentId}>
                     <Table
-                        headers={['Date', 'Complaints', 'Actions']}
-                        data={(userData.followUps || []).map(followUp => ({
-                            date: new Date(followUp.date).toLocaleDateString(),
-                            complaints: followUp.followUpComplaints,
-                            actions: followUp.followUpActions
-                        }))}
+                        headers={['Date', 'Follow-Up Complaints', 'Follow-Up Actions']}
+                        data={userData.assessment.flatMap(assessment => {
+                            const followUp = assessment.followUps;
+                            if (followUp) {
+                                return {
+                                    date: followUp.date ? new Date(followUp.date).toLocaleDateString() : "N/A",
+                                    complaints: followUp.followUpComplaints,
+                                    actions: followUp.followUpActions,
+                                };
+                            }
+                            return [{ date: "", complaints: "", actions: "" }]
+                        }).filter(followUp => followUp !== null)}
                         onEdit={(index) => handleEdit("Follow-Up", index)}
                         isFollowUp={true}
                     />
                 </SectionCard>
 
 
+
+
+
+
                 <SectionCard title="Immunizations Administered" onAdd={handleAddImmunization}>
                     <Table
                         headers={['Date', 'Vaccine', 'Remarks']}
-                        data={userData.immunization.map(immun => ({
+                        data={userData?.immunization?.map((immun, index) => ({
                             date: new Date(immun.timestamp).toLocaleDateString(),
                             vaccine: immun.vaccine,
-                            remarks: immun.remarks
-                        }))}
+                            remarks: immun.remarks,
+                            index // Include index to use it for editing
+                        })) || []}
                         onEdit={(index) => handleEdit("Immunizations Administered", index)}
                     />
+
                 </SectionCard>
 
                 <Pressable style={styles.archiveButton} onPress={fetchArchiveData}>
@@ -908,8 +1023,11 @@ export default function StudentDetailsScreen({ route }) {
                     { key: 'followUpComplaints', label: 'Follow-Up Complaints' },
                     { key: 'followUpActions', label: 'Follow-Up Actions' }
                 ]}
-                initialValues={editingItem !== null ? userData.followUps[editingItem] : {}}
+                initialValues={editingItem || {}}
             />
+
+
+
             <AddEditModal
                 visible={isAddImmunizationModalVisible}
                 onClose={() => {
@@ -922,7 +1040,7 @@ export default function StudentDetailsScreen({ route }) {
                     { key: 'vaccine', label: 'Vaccine' },
                     { key: 'remarks', label: 'Remarks' }
                 ]}
-                initialValues={editingItem !== null ? userData.immunization[editingItem] : {}}
+                initialValues={editingItem || {}}
             />
 
             <EditProfileModal

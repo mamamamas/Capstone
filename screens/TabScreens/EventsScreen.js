@@ -1,110 +1,237 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, TouchableOpacity, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput, TouchableOpacity, Platform, Alert, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const EventsScreen = ({ isAdmin }) => {
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: 'Bakuna',
-      who: 'All',
-      when: new Date('2024-10-06T12:24:00'),
-      where: 'Gym',
-      limit: '2',
-      interested: '1',
-      about: 'scascas',
-      userInterested: true,
-    },
-    {
-      id: 2,
-      title: 'Vaccine',
-      who: 'All',
-      when: new Date('2024-10-04T09:45:00'),
-      where: 'Gym',
-      limit: 'None',
-      interested: '3',
-      about: 'asdasd',
-      userInterested: false,
-    },
-  ]);
-
+export default function EventsScreen() {
+  const [events, setEvents] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [newEvent, setNewEvent] = useState({
     title: '',
     who: '',
-    when: new Date(),
+    when: {
+      startTime: new Date(),
+      endTime: new Date(new Date().getTime() + 60 * 60 * 1000),
+    },
     where: '',
     limit: '',
-    interested: '0',
     about: '',
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const [attendanceState, setAttendanceState] = useState({});
 
-  const toggleInterest = (eventId) => {
-    setEvents(events.map(event =>
-      event.id === eventId
-        ? { ...event, userInterested: !event.userInterested, interested: event.userInterested ? String(Number(event.interested) - 1) : String(Number(event.interested) + 1) }
-        : event
-    ));
+
+  useEffect(() => {
+    fetchEvents();
+    fetchCurrentUserId();
+    loadAttendanceState();
+    fetchUserRole();
+  }, []);
+
+  const fetchEvents = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    try {
+      const response = await axios.get("http://192.168.1.9:3000/event", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setEvents(response.data);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      Alert.alert("Error", "Failed to fetch events. Please try again.");
+    }
   };
 
-  const addEvent = () => {
-    setEvents([...events, { ...newEvent, id: events.length + 1, userInterested: false }]);
+  const fetchCurrentUserId = async () => {
+    const userId = await AsyncStorage.getItem('userId');
+    setCurrentUserId(userId);
+  };
+  const loadAttendanceState = async () => {
+    try {
+      const savedState = await AsyncStorage.getItem('attendanceState');
+      if (savedState) {
+        setAttendanceState(JSON.parse(savedState));
+      }
+    } catch (error) {
+      console.error("Error loading attendance state:", error);
+    }
+  };
+
+  const fetchUserRole = async () => {
+    try {
+      const role = await AsyncStorage.getItem('role');
+      setIsAdmin(role === 'admin'); // Set true only if the role is 'admin'
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  };
+  const saveAttendanceState = async (newState) => {
+    try {
+      await AsyncStorage.setItem('attendanceState', JSON.stringify(newState));
+    } catch (error) {
+      console.error("Error saving attendance state:", error);
+    }
+  };
+
+  const toggleAttendance = async (eventId) => {
+    const token = await AsyncStorage.getItem('accessToken');
+    try {
+      const response = await axios.post(`http://192.168.1.9:3000/event/${eventId}/attend`, {}, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const newAttendanceState = {
+        ...attendanceState,
+        [eventId]: !attendanceState[eventId]
+      };
+
+      setAttendanceState(newAttendanceState);
+      await saveAttendanceState(newAttendanceState);
+
+      setEvents(events.map(event => {
+        if (event._id === eventId) {
+          const updatedAttendees = event.attendees || [];
+          if (updatedAttendees.includes(currentUserId)) {
+            return { ...event, attendees: updatedAttendees.filter(id => id !== currentUserId) };
+          } else {
+            return { ...event, attendees: [...updatedAttendees, currentUserId] };
+          }
+        }
+        return event;
+      }));
+
+      Alert.alert("Success", response.data.message);
+    } catch (error) {
+      console.error("Error toggling attendance:", error);
+      Alert.alert("Error", error.response?.data?.message || "Failed to update attendance. Please try again.");
+    }
+  };
+
+  const addEvent = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    try {
+      const response = await axios.post("http://192.168.1.9:3000/event", newEvent, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setEvents([...events, response.data]);
+      setModalVisible(false);
+      resetEventForm();
+    } catch (error) {
+      console.error("Error adding event:", error);
+      Alert.alert("Error", "Failed to add event. Please try again.");
+    }
+  };
+
+  const editEvent = async () => {
+    const token = await AsyncStorage.getItem('accessToken');
+    try {
+      const response = await axios.patch(`http://192.168.1.9:3000/event/${editingEvent._id}`, editingEvent, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setEvents(events.map(event => (event._id === editingEvent._id ? response.data : event)));
+      setEditingEvent(null);
+      setModalVisible(false);
+    } catch (error) {
+      console.error("Error editing event:", error);
+      Alert.alert("Error", "Failed to edit event. Please try again.");
+    }
+  };
+
+  const deleteEvent = async (eventId, eventTitle) => {
+    Alert.alert(
+      "Confirm Deletion",
+      `Are you sure you want to delete "${eventTitle}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            const token = await AsyncStorage.getItem('accessToken');
+            try {
+              await axios.delete(`http://192.168.1.9:3000/event/${eventId}`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              setEvents(events.filter(event => event._id !== eventId));
+              Alert.alert("Success", `"${eventTitle}" has been deleted.`);
+            } catch (error) {
+              console.error("Error deleting event:", error);
+              Alert.alert("Error", "Failed to delete event. Please try again.");
+            }
+          },
+          style: "destructive"
+        }
+      ],
+      { cancelable: false }
+    );
+  };
+
+
+  const resetEventForm = () => {
     setNewEvent({
       title: '',
       who: '',
-      when: new Date(),
+      when: {
+        startTime: new Date(),
+        endTime: new Date(new Date().getTime() + 60 * 60 * 1000),
+      },
       where: '',
       limit: '',
-      interested: '0',
       about: '',
     });
-    setModalVisible(false);
   };
 
-  const editEvent = () => {
-    setEvents(events.map(event =>
-      event.id === editingEvent.id ? editingEvent : event
-    ));
-    setEditingEvent(null);
-    setModalVisible(false);
-  };
+  const handleDateTimeChange = (event, selectedDate, type) => {
+    const currentDate = selectedDate || (editingEvent ? editingEvent.when[type] : newEvent.when[type]);
 
-  const deleteEvent = (eventId) => {
-    setEvents(events.filter(event => event.id !== eventId));
-  };
-
-  const handleDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate || (editingEvent ? editingEvent.when : newEvent.when);
-    setShowDatePicker(Platform.OS === 'ios');
     if (editingEvent) {
-      setEditingEvent({ ...editingEvent, when: currentDate });
+      setEditingEvent({
+        ...editingEvent,
+        when: { ...editingEvent.when, [type]: currentDate }
+      });
     } else {
-      setNewEvent({ ...newEvent, when: currentDate });
+      setNewEvent({
+        ...newEvent,
+        when: { ...newEvent.when, [type]: currentDate }
+      });
+    }
+
+    if (type === 'startTime') {
+      setShowStartDatePicker(Platform.OS === 'ios');
+      setShowStartTimePicker(Platform.OS === 'ios');
+    } else {
+      setShowEndDatePicker(Platform.OS === 'ios');
+      setShowEndTimePicker(Platform.OS === 'ios');
     }
   };
 
-  const handleTimeChange = (event, selectedTime) => {
-    const currentTime = selectedTime || (editingEvent ? editingEvent.when : newEvent.when);
-    setShowTimePicker(Platform.OS === 'ios');
-    if (editingEvent) {
-      const newDate = new Date(editingEvent.when);
-      newDate.setHours(currentTime.getHours());
-      newDate.setMinutes(currentTime.getMinutes());
-      setEditingEvent({ ...editingEvent, when: newDate });
-    } else {
-      const newDate = new Date(newEvent.when);
-      newDate.setHours(currentTime.getHours());
-      newDate.setMinutes(currentTime.getMinutes());
-      setNewEvent({ ...newEvent, when: newDate });
-    }
-  };
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchEvents().then(() => setRefreshing(false));
+  }, []);
 
   const renderEventCard = (event) => (
-    <View key={event.id} style={styles.eventCard}>
+    <View key={event._id} style={styles.eventCard}>
       <Text style={styles.eventTitle}>{event.title}</Text>
 
       {isAdmin && (
@@ -115,7 +242,10 @@ const EventsScreen = ({ isAdmin }) => {
           }}>
             <Text style={styles.editText}>Edit</Text>
           </Pressable>
-          <Pressable style={styles.deleteButton} onPress={() => deleteEvent(event.id)}>
+          <Pressable
+            style={styles.deleteButton}
+            onPress={() => deleteEvent(event._id, event.title)}
+          >
             <Text style={styles.deleteText}>Delete</Text>
           </Pressable>
         </View>
@@ -126,24 +256,25 @@ const EventsScreen = ({ isAdmin }) => {
         style={styles.detailsContainer}
       >
         <Text style={styles.detailText}>Who: {event.who}</Text>
-        <Text style={styles.detailText}>When: {event.when.toLocaleString()}</Text>
+        <Text style={styles.detailText}>Start: {new Date(event.when.startTime).toLocaleString()}</Text>
+        <Text style={styles.detailText}>End: {new Date(event.when.endTime).toLocaleString()}</Text>
         <Text style={styles.detailText}>Where: {event.where}</Text>
         <Text style={styles.detailText}>Limit: {event.limit}</Text>
-        <Text style={styles.detailText}>Interested: {event.interested}</Text>
+        <Text style={styles.detailText}>Attendees: {event.attendees ? event.attendees.length : 0}</Text>
       </LinearGradient>
 
       <Text style={styles.aboutText}>About: {event.about}</Text>
 
-      {!isAdmin && (
-        <Pressable
-          style={event.userInterested ? styles.uninterestedButton : styles.interestedButton}
-          onPress={() => toggleInterest(event.id)}
-        >
-          <Text style={styles.interestedText}>
-            {event.userInterested ? 'Uninterested' : 'Interested'}
-          </Text>
-        </Pressable>
-      )}
+
+      <Pressable
+        style={attendanceState[event._id] ? styles.unattendButton : styles.attendButton}
+        onPress={() => toggleAttendance(event._id)}
+      >
+        <Text style={styles.attendText}>
+          {attendanceState[event._id] ? 'Uninterested' : 'Interested'}
+        </Text>
+      </Pressable>
+
     </View>
   );
 
@@ -155,10 +286,7 @@ const EventsScreen = ({ isAdmin }) => {
       onRequestClose={() => setModalVisible(false)}
     >
       <View style={styles.modalView}>
-        <ScrollView
-          style={styles.formScrollView}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
           <Text style={styles.modalTitle}>{editingEvent ? 'Edit Event' : 'Add New Event'}</Text>
 
           <View style={styles.inputContainer}>
@@ -182,45 +310,88 @@ const EventsScreen = ({ isAdmin }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Date:</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.inputLabel}>Start Date:</Text>
+            <TouchableOpacity onPress={() => setShowStartDatePicker(true)}>
               <TextInput
                 style={styles.input}
-                placeholder="Select date"
-                value={editingEvent ? editingEvent.when.toLocaleDateString() : newEvent.when.toLocaleDateString()}
+                placeholder="Select start date"
+                value={editingEvent ? new Date(editingEvent.when.startTime).toLocaleDateString() : newEvent.when.startTime.toLocaleDateString()}
                 editable={false}
               />
             </TouchableOpacity>
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Time:</Text>
-            <TouchableOpacity onPress={() => setShowTimePicker(true)}>
+            <Text style={styles.inputLabel}>Start Time:</Text>
+            <TouchableOpacity onPress={() => setShowStartTimePicker(true)}>
               <TextInput
                 style={styles.input}
-                placeholder="Select time"
-                value={editingEvent ? editingEvent.when.toLocaleTimeString() : newEvent.when.toLocaleTimeString()}
+                placeholder="Select start time"
+                value={editingEvent ? new Date(editingEvent.when.startTime).toLocaleTimeString() : newEvent.when.startTime.toLocaleTimeString()}
                 editable={false}
               />
             </TouchableOpacity>
           </View>
 
-          {showDatePicker && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>End Date:</Text>
+            <TouchableOpacity onPress={() => setShowEndDatePicker(true)}>
+              <TextInput
+                style={styles.input}
+                placeholder="Select end date"
+                value={editingEvent ? new Date(editingEvent.when.endTime).toLocaleDateString() : newEvent.when.endTime.toLocaleDateString()}
+                editable={false}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>End Time:</Text>
+            <TouchableOpacity onPress={() => setShowEndTimePicker(true)}>
+              <TextInput
+                style={styles.input}
+                placeholder="Select end time"
+                value={editingEvent ? new Date(editingEvent.when.endTime).toLocaleTimeString() : newEvent.when.endTime.toLocaleTimeString()}
+                editable={false}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {showStartDatePicker && (
             <DateTimePicker
-              value={editingEvent ? editingEvent.when : newEvent.when}
+              value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
               mode="date"
               display="default"
-              onChange={handleDateChange}
+              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
             />
           )}
 
-          {showTimePicker && (
+          {showStartTimePicker && (
             <DateTimePicker
-              value={editingEvent ? editingEvent.when : newEvent.when}
+              value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
               mode="time"
               is24Hour={true}
               display="default"
-              onChange={handleTimeChange}
+              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
+            />
+          )}
+
+          {showEndDatePicker && (
+            <DateTimePicker
+              value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
+              mode="date"
+              display="default"
+              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
+            />
+          )}
+
+          {showEndTimePicker && (
+            <DateTimePicker
+              value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
+              mode="time"
+              is24Hour={true}
+              display="default"
+              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
             />
           )}
 
@@ -245,16 +416,6 @@ const EventsScreen = ({ isAdmin }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Interested:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter number of interested"
-              value={editingEvent ? editingEvent.interested : newEvent.interested}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, interested: text }) : setNewEvent({ ...newEvent, interested: text })}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>About:</Text>
             <TextInput
               style={[styles.input, styles.multilineInput]}
@@ -274,6 +435,7 @@ const EventsScreen = ({ isAdmin }) => {
             <Text style={styles.textStyle}>{editingEvent ? 'Save Changes' : 'Add Event'}</Text>
           </Pressable>
           <Pressable
+
             style={[styles.button, styles.buttonCancel]}
             onPress={() => {
               setModalVisible(false);
@@ -291,10 +453,14 @@ const EventsScreen = ({ isAdmin }) => {
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
+      <Text>Read through the event details provided, including the event name, date, time, venue (if physical), and any special instructions.</Text>
       {isAdmin && (
         <Pressable style={styles.addButton} onPress={() => setModalVisible(true)}>
-          <Text style={styles.addButtonText}>Add</Text>
+          <Text style={styles.addButtonText}>Add Event</Text>
         </Pressable>
       )}
 
@@ -302,7 +468,7 @@ const EventsScreen = ({ isAdmin }) => {
       {renderEventForm()}
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -376,19 +542,19 @@ const styles = StyleSheet.create({
     color: '#4b6584',
     marginBottom: 10,
   },
-  interestedButton: {
+  attendButton: {
     backgroundColor: 'green',
     padding: 10,
     borderRadius: 50,
     alignSelf: 'flex-end',
   },
-  uninterestedButton: {
+  unattendButton: {
     backgroundColor: 'red',
     padding: 10,
     borderRadius: 50,
     alignSelf: 'flex-end',
   },
-  interestedText: {
+  attendText: {
     color: '#fff',
     fontSize: 14,
     textAlign: 'center',
@@ -433,7 +599,6 @@ const styles = StyleSheet.create({
     padding: 10,
     width: '100%',
   },
-
   multilineInput: {
     height: 80,
     textAlignVertical: 'top',
@@ -462,5 +627,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-export default EventsScreen;

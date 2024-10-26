@@ -16,7 +16,7 @@ const StudentListDisplay = ({ level, department, strand, gradeLevel, section }) 
       const token = await AsyncStorage.getItem('accessToken');
       try {
         setLoading(true);
-        const response = await axios.get('http://192.168.1.10:3000/medical', {
+        const response = await axios.get('http://192.168.1.9:3000/medical', {
           params: {
             educationLevel: level,
             yearlvl: gradeLevel,

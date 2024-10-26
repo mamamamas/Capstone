@@ -10,7 +10,7 @@ import ExitDialog from '../screens/Components/ExitDialog';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.10:3000';
+const API_URL = 'http://192.168.1.9:3000';
 
 export default function AdminHomeScreen() {
   const navigation = useNavigation();
@@ -185,7 +185,6 @@ export default function AdminHomeScreen() {
     try {
       await markNotificationAsRead(notification._id);
 
-      // Fetch updated notifications
       const token = await AsyncStorage.getItem('accessToken');
       const response = await axios.get(`${API_URL}/notification`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -194,7 +193,6 @@ export default function AdminHomeScreen() {
 
       setShowNotifications(false);
 
-      // Navigate to the appropriate screen based on the notification type
       switch (notification.documentType) {
         case 'Appointment':
         case 'Medical Leave Form':
@@ -202,6 +200,12 @@ export default function AdminHomeScreen() {
         case 'Special Leave Form':
         case 'Telehealth':
           navigation.navigate('DetailedRequestScreen', { requestId: notification.documentId });
+          break;
+        case 'event':
+          navigation.navigate('Events', { eventId: notification.documentId });
+          break;
+        case 'post':
+          navigation.navigate('AnnouncementList', { postId: notification.documentId });
           break;
         default:
           console.warn('Unknown notification type:', notification.documentType);
@@ -212,6 +216,7 @@ export default function AdminHomeScreen() {
       ToastAndroid.show('Failed to process notification', ToastAndroid.SHORT);
     }
   };
+
 
 
 

@@ -137,7 +137,7 @@ export default function Component() {
     setError(null);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get('http://192.168.1.10:3000/requests/admin', {
+      const response = await axios.get('http://192.168.1.9:3000/requests/admin', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAllRequests(response.data);
@@ -183,7 +183,7 @@ export default function Component() {
           formDataToSend.append('appointmentDate', formData.date.toISOString());
           formDataToSend.append('reason', formData.reason);
           response = await axios.post(
-            'http://192.168.1.10:3000/requests/appointment',
+            'http://192.168.1.9:3000/requests/appointment',
             formDataToSend,
             config
           );
@@ -200,7 +200,7 @@ export default function Component() {
             });
           }
           response = await axios.post(
-            'http://192.168.1.10:3000/requests/medical-leave',
+            'http://192.168.1.9:3000/requests/medical-leave',
             formDataToSend,
             config
           );
@@ -216,7 +216,7 @@ export default function Component() {
             });
           }
           response = await axios.post(
-            'http://192.168.1.10:3000/requests/medical-recordR',
+            'http://192.168.1.9:3000/requests/medical-recordR',
             formDataToSend,
             config
           );
@@ -227,7 +227,7 @@ export default function Component() {
           formDataToSend.append('reason', formData.leaveType);
           formDataToSend.append('additionalReason', formData.additionalInfo || '');
           response = await axios.post(
-            'http://192.168.1.10:3000/requests/special-leave',
+            'http://192.168.1.9:3000/requests/special-leave',
             formDataToSend,
             config
           );
@@ -238,7 +238,7 @@ export default function Component() {
           formDataToSend.append('reason', formData.reason);
           formDataToSend.append('telehealthType', formData.consultationType);
           response = await axios.post(
-            'http://192.168.1.10:3000/requests/telehealth',
+            'http://192.168.1.9:3000/requests/telehealth',
             {
               appointmentDate: formData.date.toISOString(),
               reason: formData.reason,
