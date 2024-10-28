@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, Pressable, Modal, TextInput, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, SafeAreaView, Pressable, Modal, TextInput, Image, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -162,50 +162,98 @@ const AddEditModal = ({ visible, onClose, onSave, title, fields, initialValues =
 };
 
 const EditProfileModal = ({ visible, onClose, student, onSave }) => {
-    const [editedStudent, setEditedStudent] = useState({ ...student });
+    const [editedStudent, setEditedStudent] = useState({
+        personal: {},
+        education: {},
+        medical: {}
+    });
+
+    useEffect(() => {
+        if (visible && student) {
+            setEditedStudent({
+                personal: { ...student.personal },
+                education: { ...student.education },
+                medical: { ...student.medical }
+            });
+        }
+    }, [visible, student]);
+
+    const handleChange = (section, key, value) => {
+        if (section !== 'personal') { // prevent changes to personal information
+            setEditedStudent(prev => ({
+                ...prev,
+                [section]: {
+                    ...prev[section],
+                    [key]: value
+                }
+            }));
+        }
+    };
 
     const handleSave = () => {
         onSave(editedStudent);
         onClose();
     };
 
-    const renderField = (key, label, editable = true, section = null) => (
-        <View key={key}>
-            {section && <Text style={styles.sectionTitle}>{section}</Text>}
-            <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>{label}:</Text>
-                {editable ? (
-                    <TextInput
-                        style={styles.input}
-                        onChangeText={(text) => setEditedStudent({ ...editedStudent, [key]: text })}
-                        value={editedStudent[key]?.toString() || ''}
+    const renderField = (section, key, label, editable = true, type = 'text') => (
+        <View key={`${section}-${key}`} style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>{label}:</Text>
+            {editable ? (
+                type === 'boolean' ? (
+                    <Switch
+                        value={editedStudent[section][key]}
+                        onValueChange={(value) => handleChange(section, key, value)}
+                    />
+                ) : type === 'date' ? (
+                    <DateTimePicker
+                        value={new Date(editedStudent[section][key])}
+                        mode="date"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                            handleChange(section, key, selectedDate.toISOString());
+                        }}
                     />
                 ) : (
-                    <Text style={styles.nonEditableText}>{editedStudent[key]?.toString() || 'N/A'}</Text>
-                )}
-            </View>
+                    <TextInput
+                        style={styles.input}
+                        onChangeText={(text) => handleChange(section, key, text)}
+                        value={editedStudent[section][key]?.toString() || ''}
+                        editable={section !== 'personal'} // make personal fields non-editable
+                    />
+                )
+            ) : (
+                <Text style={styles.nonEditableText}>
+                    {editedStudent[section][key]?.toString() || 'N/A'}
+                </Text>
+            )}
         </View>
     );
 
-    const nonEditableFields = [
-        { key: 'name', label: 'Full Name', section: 'I. Personal Information' },
-        { key: 'educationLevel', label: 'Education Level' },
-        { key: 'grade', label: 'Grade/Year' },
-        { key: 'section', label: 'Section' },
-        { key: 'age', label: 'Age' },
+    const personalFields = [
+        { key: 'firstName', label: 'First Name' },
+        { key: 'lastName', label: 'Last Name' },
         { key: 'sex', label: 'Sex' },
         { key: 'civilStatus', label: 'Civil Status' },
-        { key: 'birthdate', label: 'Birthdate' },
+        { key: 'dateOfBirth', label: 'Birthdate', type: 'date' },
         { key: 'address', label: 'Address' },
         { key: 'telNo', label: 'Tel. No.' },
         { key: 'religion', label: 'Religion' },
         { key: 'guardian', label: 'Guardian' },
         { key: 'guardianAddress', label: "Guardian's Address" },
-        { key: 'guardianNumber', label: "Guardian's Number" },
+        { key: 'guardianTelNo', label: "Guardian's Number" },
+        { key: 'yearlvl', label: 'Education Level' },
+        { key: 'grade', label: 'Grade/Year' },
+        { key: 'section', label: 'Section' },
     ];
 
-    const editableFields = [
-        { key: 'respiratory', label: 'Respiratory', section: 'II. Medical History' },
+    const educationFields = [
+        { key: 'yearlvl', label: 'Education Level' },
+        { key: 'grade', label: 'Grade/Year' },
+        { key: 'section', label: 'Section' },
+    ];
+
+    const medicalFields = [
+        { key: 'respiratory', label: 'Respiratory' },
         { key: 'digestive', label: 'Digestive' },
         { key: 'nervous', label: 'Nervous' },
         { key: 'excretory', label: 'Excretory' },
@@ -216,10 +264,10 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
         { key: 'reproductive', label: 'Reproductive' },
         { key: 'lymphatic', label: 'Lymphatic' },
         { key: 'psychological', label: 'Psychological' },
-        { key: 'smoking', label: 'Do you smoke?', section: 'III. Habits and Allergies' },
-        { key: 'drinking', label: 'Do you drink?' },
+        { key: 'smoking', label: 'Do you smoke?', type: 'boolean' },
+        { key: 'drinking', label: 'Do you drink?', type: 'boolean' },
         { key: 'allergy', label: 'Allergy?' },
-        { key: 'eyes', label: 'Eyes', section: 'IV. Physical Examination' },
+        { key: 'eyes', label: 'Eyes' },
         { key: 'ear', label: 'Ear' },
         { key: 'nose', label: 'Nose' },
         { key: 'throat', label: 'Throat' },
@@ -227,7 +275,7 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
         { key: 'teeth', label: 'Teeth' },
         { key: 'tongue', label: 'Tongue' },
         { key: 'neck', label: 'Neck' },
-        { key: 'thyroid', label: 'Thyroid' },
+        { key: 'thyroids', label: 'Thyroid' },
         { key: 'cervicalGlands', label: 'Cervical Glands' },
         { key: 'chest', label: 'Chest' },
         { key: 'contour', label: 'Contour' },
@@ -244,14 +292,14 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
         { key: 'spleen', label: 'Spleen' },
         { key: 'kidneys', label: 'Kidneys' },
         { key: 'extremities', label: 'Extremities' },
-        { key: 'upper', label: 'Upper' },
-        { key: 'lower', label: 'Lower' },
-        { key: 'bloodChemistry', label: 'Blood Chemistry', section: 'V. Laboratory Examination' },
+        { key: 'upperExtremities', label: 'Upper Extremities' },
+        { key: 'lowerExtremities', label: 'Lower Extremities' },
+        { key: 'bloodChemistry', label: 'Blood Chemistry' },
         { key: 'cbc', label: 'CBC' },
         { key: 'urinalysis', label: 'Urinalysis' },
         { key: 'fecalysis', label: 'Fecalysis' },
-        { key: 'chestXray', label: 'Chest X-ray Findings', section: 'VI. Diagnostic Procedures' },
-        { key: 'otherProcedures', label: 'Other Procedures', section: 'VII. Others (ECG, Ultrasound, etc.)' },
+        { key: 'chestXray', label: 'Chest X-ray Findings' },
+        { key: 'others', label: 'Other Procedures' },
     ];
 
     return (
@@ -265,13 +313,14 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
                 <View style={styles.modalView}>
                     <Text style={styles.modalTitle}>Edit Profile</Text>
                     <ScrollView style={styles.modalScrollView}>
-                        {nonEditableFields.map((field, index) =>
-                            renderField(field.key, field.label, false, index === 0 ? field.section : null)
-                        )}
+                        <Text style={styles.sectionTitle}>Personal Information</Text>
+                        {personalFields.map(field => renderField('personal', field.key, field.label, false, field.type))}
 
-                        {editableFields.map((field, index) =>
-                            renderField(field.key, field.label, true, field.section)
-                        )}
+                        <Text style={styles.sectionTitle}>Education Information</Text>
+                        {educationFields.map(field => renderField('education', field.key, field.label, false, field.type))}
+
+                        <Text style={styles.sectionTitle}>Medical Information</Text>
+                        {medicalFields.map(field => renderField('medical', field.key, field.label, true, field.type))}
                     </ScrollView>
                     <View style={styles.buttonContainer}>
                         <Pressable
@@ -292,6 +341,7 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
         </Modal>
     );
 };
+
 
 const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
     const [values, setValues] = useState(initialValues);
@@ -403,37 +453,56 @@ export default function StudentDetailsScreen({ route }) {
 
 
     const fetchUserDetails = async () => {
-        const token = await AsyncStorage.getItem('accessToken');
+        setLoading(true);
+        setError(null);
         try {
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+                throw new Error('No access token found');
+            }
+
             const response = await axios.get(`http://192.168.1.9:3000/user/profile/${userId}`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
-            setUserData(response.data);
+
+            if (response.status === 200 && response.data) {
+                console.log('Fetched user data:', JSON.stringify(response.data, null, 2));
+                setUserData(response.data);
+                return response.data;
+            } else {
+                throw new Error('Unexpected response from server');
+            }
         } catch (err) {
             console.error('Failed to load user details', err);
             setError('Failed to load user details');
+            return null;
         } finally {
             setLoading(false);
         }
     };
 
     const fetchArchiveData = async () => {
-        const token = await AsyncStorage.getItem('accessToken');
         try {
-            const response = await axios.get(`http://192.168.1.9:3000/archive/${userId}/assessment`, {
+            const token = await AsyncStorage.getItem('accessToken');
+            if (!token) {
+                throw new Error('No access token found');
+            }
+
+            const response = await axios.get(`http://192.168.1.9:3000/archive/${userId}/immunization`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
 
+            console.log('Archive data response:', response.data);
 
             setArchiveData(response.data);
             setShowArchiveModal(true);
         } catch (err) {
             console.error('Error fetching archive data:', err);
-            setError('Failed to load archive data');
+            setError(err.response?.data?.error || 'Failed to load archive data');
             Alert.alert('Error', 'Failed to load archive data. Please try again.');
         }
     };
@@ -448,6 +517,11 @@ export default function StudentDetailsScreen({ route }) {
     const handleAddImmunization = () => {
         setEditingItem(null);
         setIsAddImmunizationModalVisible(true);
+        if (userData && userData.assessment) {
+            console.log("ean", userData.immunization[0]?.medicalInfoId); // Optional chaining to avoid errors
+        } else {
+            console.log('userData or assessments are undefined');
+        }
     };
     const handleAddAssessment = () => {
         setEditingAssessment(null);
@@ -455,7 +529,7 @@ export default function StudentDetailsScreen({ route }) {
         setIsEditAssessmentModalVisible(false);
 
         if (userData && userData.assessment) {
-            console.log(userData.assessment[0]?.medicalInfoId); // Optional chaining to avoid errors
+            console.log("ean", userData.assessment[0]?.medicalInfoId); // Optional chaining to avoid errors
         } else {
             console.log('userData or assessments are undefined');
         }
@@ -722,22 +796,52 @@ export default function StudentDetailsScreen({ route }) {
 
 
 
-
+    console.log(userId)
 
     const handleSaveProfile = async (updatedStudent) => {
         const token = await AsyncStorage.getItem('accessToken');
+        if (!token) {
+            Alert.alert('Error', 'You must be logged in to update your profile.');
+            return;
+        }
+
         try {
-            const response = await axios.put(`http://192.168.1.10:3000/user/${userId}`, updatedStudent, {
+            const response = await axios.patch(`http://192.168.1.9:3000/user/profiles/${userId}`, updatedStudent, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setUserData(response.data);
-            setIsEditProfileModalVisible(false);
+
+            if (response.status === 200 && response.data) {
+                setUserData(prevData => {
+                    const newData = {
+                        ...prevData,
+                        ...response.data
+                    };
+
+                    return newData;
+                });
+                setIsEditProfileModalVisible(false);
+                Alert.alert('Success', 'Profile updated successfully');
+                // Fetch user details again to confirm the update
+                await fetchUserDetails();
+            } else {
+                throw new Error('Unexpected response from server');
+            }
         } catch (error) {
             console.error('Error updating profile:', error);
-            Alert.alert('Error', 'Failed to update profile');
+            let errorMessage = 'Failed to update profile. Please try again.';
+            if (error.response) {
+                console.log('Error response:', error.response.data);
+                errorMessage = error.response.data.error || errorMessage;
+            } else if (error.request) {
+                console.log('No response received:', error.request);
+                errorMessage = 'No response from server. Please check your connection.';
+            } else {
+                console.log('Error', error.message);
+                errorMessage = error.message;
+            }
+            Alert.alert('Error', errorMessage);
         }
     };
-
     const handleSaveBMI = async (bmiData) => {
         const token = await AsyncStorage.getItem('accessToken');
         try {
@@ -759,6 +863,7 @@ export default function StudentDetailsScreen({ route }) {
             Alert.alert('Error', 'Failed to update BMI');
         }
     };
+    console.log
 
     const renderArchiveChanges = (changes, title) => (
         <View>
@@ -1049,7 +1154,6 @@ export default function StudentDetailsScreen({ route }) {
                 student={userData}
                 onSave={handleSaveProfile}
             />
-
             <ScanBMIModal
                 visible={isScanBMIModalVisible}
                 onClose={() => setIsScanBMIModalVisible(false)}
