@@ -1,6 +1,8 @@
-// InitialLoginScreen.js
-import React, { useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions, Animated } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, Dimensions, Animated, ActivityIndicator } from 'react-native';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 import ImageCarousel from './Components/ImageCarousel';
 import Colors from '../constants/Colors';
 
@@ -23,7 +25,85 @@ const images = [
 const loopedImages = [...images, ...images, ...images, ...images];
 
 const InitialLoginScreen = ({ navigation }) => {
-  const scrollX = useRef(new Animated.Value(0)).current; // Create scrollX for animation
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: '613395138398-an9mnugc70qov6v7mee7i9musciqcrhl.apps.googleusercontent.com',
+      offlineAccess: true,
+      forceCodeForRefreshToken: true,
+      scopes: ['email', 'profile'],
+    });
+  }, []);
+  const storeUserData = async (id, accessToken, role, firstname, username, profilePic) => {
+    try {
+      await AsyncStorage.setItem('id', id);
+      await AsyncStorage.setItem('accessToken', accessToken);
+      await AsyncStorage.setItem('role', role);
+      await AsyncStorage.setItem('firstname', firstname || 'Student');
+      await AsyncStorage.setItem('username', username);
+      await AsyncStorage.setItem('profilePic', profilePic); // Save profile picture URL
+
+      console.log('User data stored successfully');
+    } catch (error) {
+      console.error('Error saving user data:', error);
+    }
+  };
+
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await GoogleSignin.hasPlayServices();
+      const userInfo = await GoogleSignin.signIn();
+
+      console.log("User Info:", userInfo);
+
+      // Extract the ID token from the response
+      const idToken = userInfo.data.idToken; // Access the ID token directly
+
+      if (idToken) {
+        const response = await axios.post('http://192.168.1.9:3000/login/auth/google', {
+          token: idToken,
+        });
+
+        console.log("Backend Response:", response.data);
+
+        if (response.data.success) {
+          const { token, role, firstname, username, id, profilePic } = response.data;
+
+          // Store user data in AsyncStorage
+          await storeUserData(id, token, role, firstname, username, profilePic);
+
+
+
+          navigation.navigate('StudentHome'); // Navigate to the StudentHome screen
+        } else {
+          setError('Backend authentication failed');
+        }
+      } else {
+        setError("Failed to retrieve ID Token");
+      }
+    } catch (error) {
+      console.error('Google login error:', error);
+
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        setError('Google Sign-In was cancelled');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        setError('Google Sign-In operation is in progress');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setError('Play services not available or outdated');
+      } else {
+        setError('An error occurred during Google login');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <View style={styles.loginContainer}>
@@ -34,11 +114,17 @@ const InitialLoginScreen = ({ navigation }) => {
           <Text style={styles.title}>Welcome to</Text>
           <Text style={[styles.title, { fontWeight: 'bold' }]}>Saulus</Text>
         </View>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <Pressable
           style={[styles.button, { backgroundColor: Colors.white }]}
-          onPress={() => navigation.navigate('StudentLogin')}
+          onPress={handleGoogleLogin}
+          disabled={loading}
         >
-          <Text style={[styles.buttonText, { color: 'black' }]}>Login as Student</Text>
+          {loading ? (
+            <ActivityIndicator color={Colors.cobaltblue} />
+          ) : (
+            <Text style={[styles.buttonText, { color: 'black' }]}>Login with Google</Text>
+          )}
         </Pressable>
         <Pressable
           style={styles.button}
@@ -88,6 +174,11 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     marginBottom: 40,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });
 

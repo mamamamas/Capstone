@@ -25,7 +25,7 @@ import axios from 'axios';
 
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
-const API_URL = 'http://192.168.1.10:3000';
+const API_URL = 'http://192.168.1.9:3000';
 
 const StudentHomeContent = ({ navigation }) => {
   const [showExitDialog, setShowExitDialog] = useState(false);
@@ -36,7 +36,7 @@ const StudentHomeContent = ({ navigation }) => {
   const [firstName, setFirstName] = useState('Student');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-
+  const [profilePic, setProfilePic] = useState(null);
   useEffect(() => {
     fetchUserName();
     fetchNotifications();
@@ -68,14 +68,23 @@ const StudentHomeContent = ({ navigation }) => {
 
   const fetchUserName = async () => {
     try {
-      const firstname = await AsyncStorage.getItem('firstname');
-      if (firstname !== null) {
-        setFirstName(firstname);
+      const storedFirstName = await AsyncStorage.getItem('firstname');
+      const storedProfilePic = await AsyncStorage.getItem('profilePic');
+      if (storedFirstName) {
+        setFirstName(storedFirstName);
+        setProfilePic(storedProfilePic);
+      } else {
+        const userInfo = await GoogleSignin.getCurrentUser();
+        if (userInfo) {
+          setFirstName(userInfo.user.givenName || 'Student');
+          await AsyncStorage.setItem('firstname', userInfo.user.givenName || 'Student');
+        }
       }
     } catch (error) {
       console.error('Error fetching user name:', error);
     }
   };
+
 
   const fetchNotifications = async () => {
     try {
@@ -233,7 +242,7 @@ const StudentHomeContent = ({ navigation }) => {
             }}
           >
             <Image
-              source={require('../assets/default-profile-pic.png')}
+              source={profilePic ? { uri: profilePic } : require('../assets/default-profile-pic.png')}
               style={styles.profilePic}
             />
           </Pressable>

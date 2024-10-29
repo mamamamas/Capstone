@@ -43,7 +43,7 @@ export default function AdminLoginScreen({ navigation }) {
             await AsyncStorage.removeItem('name');
 
 
-            const response = await axios.post('http://192.168.1.10:3000/user/login', {
+            const response = await axios.post('http://192.168.1.9:3000/user/login', {
                 email,
                 password,
             });
@@ -60,7 +60,7 @@ export default function AdminLoginScreen({ navigation }) {
 
                 if (role === 'admin' || role === 'staff') {
                     navigation.navigate('AdminDasboard');
-                } else if (role === 'user') {
+                } else if (role === 'student' || role === 'user') {
                     navigation.navigate('StudentHome');
                 }
 

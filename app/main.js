@@ -38,7 +38,7 @@ export default function Main() {
                 ]);
 
                 if (!token || !storedRole) {
-                    setInitialRoute('AdminDasboard');
+                    setInitialRoute('InitialLogin');
                     return;
                 }
 

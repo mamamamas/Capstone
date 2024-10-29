@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput, Alert, Linking } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -35,11 +35,12 @@ export default function DetailedRequestScreen() {
         setUserRole(role);
         setUserId(id);
 
-        const response = await axios.get(`http://192.168.1.10:3000/requests/${requestId}`, {
+        const response = await axios.get(`http://192.168.1.9:3000/requests/${requestId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
+        console.log('API Response:', JSON.stringify(response.data, null, 2));
         setRequest(response.data);
         setStatus(response.data.appointment.status);
       } catch (error) {
@@ -61,7 +62,7 @@ export default function DetailedRequestScreen() {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.patch(`http://192.168.1.10:3000/requests/${requestId}`,
+      const response = await axios.patch(`http://192.168.1.9:3000/requests/${requestId}`,
         { status: newStatus, feedback },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -154,24 +155,44 @@ export default function DetailedRequestScreen() {
         <Text style={styles.label}>{reasonLabel} <Text style={styles.text}>{request?.appointment?.reason || 'N/A'}</Text></Text>
         <Text style={styles.label}>{dateTimeLabel} <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
         <Text style={styles.label}>Status: <Text style={[styles.text, styles[status]]}>{status || 'N/A'}</Text></Text>
-        <Text style={styles.label}>Handled By: <Text style={styles.text}>{request?.staffDetails?.firstName} {request?.staffDetails?.lastName || 'Unassigned'}</Text></Text>
+        <Text style={styles.label}>Handled By: <Text style={styles.text}>{request?.appointment?.handledBy} {request?.staffDetails?.lastName || 'Unassigned'}</Text></Text>
         <Text style={styles.label}>Feedback: <Text style={styles.text}>{request?.appointment?.feedback || 'No feedback yet'}</Text></Text>
         <Text style={styles.label}>Made When: <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>
+        {request?.appointment?.supportingDoc ? (
+          <Text style={styles.label}>
+            Supporting Document:{' '}
+            <Text style={[styles.text, { color: 'blue' }]} onPress={() => Linking.openURL(request.appointment.supportingDoc)}>
+              {request.appointment.supportingDoc}
+            </Text>
+          </Text>
+        ) : null}
+
       </View>
       {(userRole === 'admin' || (userRole === 'staff' && !isOwnRequest)) && (
         <View style={styles.actionContainer}>
           <View style={styles.buttonContainer}>
             <Pressable
-              style={[styles.button, styles.declineButton]}
-              onPress={() => setShowFeedbackInput('declined')}
+              style={[
+                styles.button,
+                styles.declineButton,
+                (request?.appointment?.status === 'approved' || request?.appointment?.status === 'declined') && styles.disabledButton
+              ]}
+              onPress={() => request?.appointment?.status !== 'approved' && request?.appointment?.status !== 'declined' && setShowFeedbackInput('declined')}
               accessibilityLabel="Decline Request"
+              disabled={request?.appointment?.status === 'approved' || request?.appointment?.status === 'declined'}
             >
               <Text style={styles.buttonText}>Decline</Text>
             </Pressable>
+
             <Pressable
-              style={[styles.button, styles.approveButton]}
-              onPress={() => setShowFeedbackInput('approved')}
+              style={[
+                styles.button,
+                styles.approveButton,
+                (request?.appointment?.status === 'approved' || request?.appointment?.status === 'declined') && styles.disabledButton
+              ]}
+              onPress={() => request?.appointment?.status !== 'approved' && request?.appointment?.status !== 'declined' && setShowFeedbackInput('approved')}
               accessibilityLabel="Approve Request"
+              disabled={request?.appointment?.status === 'approved' || request?.appointment?.status === 'declined'}
             >
               <Text style={styles.buttonText}>Approve</Text>
             </Pressable>
@@ -196,6 +217,7 @@ export default function DetailedRequestScreen() {
           )}
         </View>
       )}
+
     </ScrollView>
   );
 }
@@ -324,4 +346,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  disabledButton: {
+    opacity: 0.5,
+  }
+
 });

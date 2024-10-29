@@ -4,7 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const API_BASE_URL = 'http://192.168.1.10:3000'; // Replace with your actual API base URL
+const API_BASE_URL = 'http://192.168.1.9:3000'; // Replace with your actual API base URL
 
 export default function Component({ route }) {
   const [loading, setLoading] = useState(true);
@@ -12,27 +12,40 @@ export default function Component({ route }) {
   const [profileData, setProfileData] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { userId } = route.params;
-
-
-
+  const [profilePic, setProfilePic] = useState(null);
   useEffect(() => {
     fetchProfileData();
+    fetchUserName()
   }, [userId]);
+  const fetchUserName = async () => {
+    try {
 
+      const storedProfilePic = await AsyncStorage.getItem('profilePic');
+      if (storedProfilePic) {
+        setProfilePic(storedProfilePic);
+      } else {
+        const userInfo = await GoogleSignin.getCurrentUser();
+        if (userInfo) {
+          setFirstName(userInfo.user.givenName || 'Student');
+          await AsyncStorage.setItem('firstname', userInfo.user.givenName || 'Student');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user name:', error);
+    }
+  };
   const fetchProfileData = async () => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
+      if (!token) throw new Error('Token not found');
 
-      if (!token) {
-        throw new Error('Token not found');
-      }
-      console.log('Making request to:', `${API_BASE_URL}/user/profile/${userId}`);
       const response = await axios.get(`${API_BASE_URL}/user/profile/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
       setProfileData(response.data);
     } catch (err) {
       console.error('Error fetching profile data:', err);
@@ -41,16 +54,12 @@ export default function Component({ route }) {
       setLoading(false);
     }
   };
-
   const handleSave = async (updatedPersonal, updatedMedical) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
       const userId = await AsyncStorage.getItem('id');
-
-      if (!token || !userId) {
-        throw new Error('User ID or token not found');
-      }
+      if (!token || !userId) throw new Error('User ID or token not found');
 
       await axios.patch(`${API_BASE_URL}/user/profile/${userId}`, {
         personal: updatedPersonal,
@@ -61,7 +70,6 @@ export default function Component({ route }) {
         }
       });
 
-      // Reload the data immediately after successful edit
       await fetchProfileData();
       setModalVisible(false);
       Alert.alert('Success', 'Profile updated successfully');
@@ -115,18 +123,19 @@ export default function Component({ route }) {
     );
   }
 
-  const { personal, medical, education, assessment, immunization, pfp } = profileData;
+  const { personal, medical, education, assessment, immunization } = profileData;
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        {pfp ? (
-          <Image source={{ uri: pfp }} style={styles.profilePicture} />
+        {profilePic ? (
+          <Image source={{ uri: profilePic }} style={styles.profilePicture} />
         ) : (
           <View style={styles.profilePicture}>
             <Text style={styles.profileLetter}>{personal?.firstName?.[0] || 'U'}</Text>
           </View>
         )}
+
         <View style={styles.healthInfo}>
           <HealthMetric label="Weight" value={medical?.weight || 'N/A'} />
           <HealthMetric label="Height" value={medical?.height || 'N/A'} />

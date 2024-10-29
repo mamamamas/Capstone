@@ -17,7 +17,7 @@ const LogoutScreen = ({ navigation }) => {
           return;
         }
 
-        const response = await axios.post('http://192.168.1.10:3000/user/logout', {}, {
+        const response = await axios.post('http://192.168.1.9:3000/user/logout', {}, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -25,6 +25,7 @@ const LogoutScreen = ({ navigation }) => {
           await AsyncStorage.removeItem('accessToken');
           await AsyncStorage.removeItem('role');
           await AsyncStorage.removeItem('firstname');
+          await AsyncStorage.removeItem('id');
           navigation.replace('InitialLogin');
         } else {
           alert('Logout Failed: ' + response.data.message);
