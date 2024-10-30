@@ -47,6 +47,11 @@ export default function Component({ route }) {
       });
 
       setProfileData(response.data);
+
+      // Store the first name in AsyncStorage
+      if (response.data.personal?.firstName) {
+        await AsyncStorage.setItem('firstname', response.data.personal.firstName);
+      }
     } catch (err) {
       console.error('Error fetching profile data:', err);
       setError('Failed to load profile data. Please try again.');
@@ -61,7 +66,7 @@ export default function Component({ route }) {
       const userId = await AsyncStorage.getItem('id');
       if (!token || !userId) throw new Error('User ID or token not found');
 
-      await axios.patch(`${API_BASE_URL}/user/profile/${userId}`, {
+      await axios.patch(`${API_BASE_URL}/user/profiles/${userId}`, {
         personal: updatedPersonal,
         medical: updatedMedical
       }, {
@@ -125,6 +130,16 @@ export default function Component({ route }) {
 
   const { personal, medical, education, assessment, immunization } = profileData;
 
+  const filterSensitiveInfo = (data) => {
+    if (!data) return {};
+    const filtered = { ...data };
+    delete filtered._id;
+    delete filtered.userId;
+    delete filtered.timestamp;
+    delete filtered.__v;
+    return filtered;
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -147,9 +162,9 @@ export default function Component({ route }) {
       </View>
 
       <View style={styles.content}>
-        <InfoSection title="Personal Information" data={personal} />
-        <InfoSection title="Education Information" data={education} />
-        <InfoSection title="Medical Information" data={medical} />
+        <InfoSection title="Personal Information" data={filterSensitiveInfo(personal)} />
+        <InfoSection title="Education Information" data={filterSensitiveInfo(education)} />
+        <InfoSection title="Medical Information" data={filterSensitiveInfo(medical)} />
 
 
         {assessment && assessment.length > 0 && (

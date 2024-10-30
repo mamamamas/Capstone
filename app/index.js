@@ -49,14 +49,14 @@ export default function AdminLoginScreen({ navigation }) {
             });
 
             if (response.status === 200) {
-                const { id, accessToken, role, firstname } = response.data;
-                console.log('Login successful:', { id, email, role });
+                const { id, accessToken, role, firstname, username } = response.data;
+                console.log('Login successful:', { id, email, role, username });
                 Alert.alert('Success', 'Login successful!');
 
                 // const credentials = Realm.Credentials.jwt(accessToken);
                 // await app.logIn(credentials);
 
-                await storeUserData(id, accessToken, role, firstname);
+                await storeUserData(id, accessToken, role, firstname, username);
 
                 if (role === 'admin' || role === 'staff') {
                     navigation.navigate('AdminDasboard');

@@ -22,6 +22,7 @@ import LogoutScreen from './TabScreens/LogoutScreen';
 import StudentProfileScreen from './StudentProfileScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import RefreshableScreen from '../app/Reloading';
 
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();
@@ -70,20 +71,23 @@ const StudentHomeContent = ({ navigation }) => {
     try {
       const storedFirstName = await AsyncStorage.getItem('firstname');
       const storedProfilePic = await AsyncStorage.getItem('profilePic');
+
       if (storedFirstName) {
         setFirstName(storedFirstName);
         setProfilePic(storedProfilePic);
       } else {
         const userInfo = await GoogleSignin.getCurrentUser();
         if (userInfo) {
-          setFirstName(userInfo.user.givenName || 'Student');
-          await AsyncStorage.setItem('firstname', userInfo.user.givenName || 'Student');
+          const googleName = userInfo.user.givenName || 'Student';
+          setFirstName(googleName);
+          await AsyncStorage.setItem('firstname', googleName);
         }
       }
     } catch (error) {
       console.error('Error fetching user name:', error);
     }
   };
+
 
 
   const fetchNotifications = async () => {

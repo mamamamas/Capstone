@@ -57,12 +57,12 @@ export default function AdminHomeScreen() {
 
   const fetchUserName = async () => {
     try {
-      const firstname = await AsyncStorage.getItem('firstname');
-      if (firstname !== null) {
-        setFirstName(firstname);
+      const username = await AsyncStorage.getItem('username');
+      if (username !== null) {
+        setFirstName(username);
       }
     } catch (error) {
-      console.error('Error fetching user name:', error);
+      console.error('Error fetching username:', error);
     }
   };
 

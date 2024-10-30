@@ -20,23 +20,23 @@ const StudentRecordScreen = () => {
   // Updated section options for JHS, SHS, and College
   const sectionOptions = {
     JHS: {
-      'Grade 7': [' gr 7', ' gr 7-2'],
-      'Grade 8': [' gr 8', ' gr 8-2'],
-      'Grade 9': [' gr 9', ' gr 9-2'],
-      'Grade 10': [' gr 10', ' gr 10-2'],
+      'Grade 7': ['A', 'B', 'C', 'D'],
+      '8': ['A', 'B', 'C', 'D'],
+      '9': ['A', 'B', 'C', 'D'],
+      '10': ['A', 'B', 'C', 'D'],
     },
     SHS: {
       HUMSS: {
-        'Grade 11': ['HUMSS 11-1', 'HUMSS 11-2'],
-        'Grade 12': ['HUMSS 12-1', 'HUMSS 12-2'],
+        '11': ['HUMSS 11-1', 'HUMSS 11-2'],
+        '12': ['HUMSS 12-1', 'HUMSS 12-2'],
       },
       STEM: {
-        'Grade 11': ['STEM 11-1', 'STEM 11-2'],
-        'Grade 12': ['STEM 12-1', 'STEM 12-2'],
+        '11': ['STEM 11-1', 'STEM 11-2'],
+        '12': ['STEM 12-1', 'STEM 12-2'],
       },
       ABM: {
-        'Grade 11': ['ABM 11-1', 'ABM 11-2'],
-        'Grade 12': ['ABM 12-1', 'ABM 12-2'],
+        '11': ['ABM 11-1', 'ABM 11-2'],
+        '12': ['ABM 12-1', 'ABM 12-2'],
       },
     },
     College: {

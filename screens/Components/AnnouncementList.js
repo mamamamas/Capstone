@@ -27,7 +27,7 @@ export default function AnnouncementList() {
     try {
       const role = await AsyncStorage.getItem('role');
       console.log('User role:', role);
-      setIsAdmin(role === 'admin'); // Set true only if the role is 'admin'
+      setIsAdmin(role === 'admin' || role === 'staff');
     } catch (error) {
       console.error('Error fetching user role:', error);
     }

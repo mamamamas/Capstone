@@ -58,8 +58,11 @@ const InitialLoginScreen = ({ navigation }) => {
     setError('');
     try {
       await GoogleSignin.hasPlayServices();
-      const userInfo = await GoogleSignin.signIn();
 
+      // Clear the cached Google account to prompt account selection
+      await GoogleSignin.signOut();
+
+      const userInfo = await GoogleSignin.signIn(); // Attempting Google Sign-In
       console.log("User Info:", userInfo);
 
       // Extract the ID token from the response

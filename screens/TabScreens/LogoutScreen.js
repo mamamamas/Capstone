@@ -26,6 +26,7 @@ const LogoutScreen = ({ navigation }) => {
           await AsyncStorage.removeItem('role');
           await AsyncStorage.removeItem('firstname');
           await AsyncStorage.removeItem('id');
+          await AsyncStorage.clear()
           navigation.replace('InitialLogin');
         } else {
           alert('Logout Failed: ' + response.data.message);

@@ -1,30 +1,59 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import axios from 'axios';
 import Colors from '../constants/Colors';
 import EditAccountModal from '../screens/Components/EditAccountModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const API_BASE_URL = 'http://192.168.1.9:3000/admin'; // Replace with your actual API base URL
 const accountTypes = ['JHS', 'SHS', 'College'];
 
 export default function ManageAccountScreen() {
   const navigation = useNavigation();
   const [selectedType, setSelectedType] = useState('JHS');
-  const [accounts, setAccounts] = useState([
-    { id: '1', name: 'N/A N/A', type: 'JHS', username: 'jhs1', email: 'jhs1@school.com', department: 'JHS' },
-    { id: '2', name: 'N/A N/A', type: 'JHS', username: 'jhs2', email: 'jhs2@school.com', department: 'JHS' },
-    { id: '3', name: 'John Doe', type: 'SHS', username: 'shs1', email: 'shs1@school.com', department: 'SHS' },
-    { id: '4', name: 'Jane Smith', type: 'College', username: 'college1', email: 'college1@school.com', department: 'College' },
-  ]);
+  const [accounts, setAccounts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
 
-  const filteredAccounts = accounts.filter(account => account.type === selectedType);
+  useEffect(() => {
+    fetchAccounts(selectedType);
+  }, [selectedType]);
+
+  const fetchAccounts = async (educationLevel) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await axios.get(`${API_BASE_URL}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { educationLevel },
+      });
+
+      if (response.data && Array.isArray(response.data)) {
+        setAccounts(response.data);
+      } else {
+        throw new Error('Invalid data received from server');
+      }
+    } catch (err) {
+      console.error('Error fetching accounts:', err);
+      setError('Failed to load accounts. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const renderAccountItem = ({ item }) => (
     <View style={styles.accountItem}>
-      <Text style={styles.accountName}>{item.name}</Text>
-      <Pressable 
-        style={styles.editButton} 
+      <Text style={styles.accountName}>{`${item.firstName} ${item.lastName}`}</Text>
+      <Pressable
+        style={styles.editButton}
         onPress={() => handleEditAccount(item)}
       >
         <Text style={styles.editButtonText}>Edit</Text>
@@ -32,17 +61,86 @@ export default function ManageAccountScreen() {
     </View>
   );
 
-  const handleEditAccount = (account) => {
-    setSelectedAccount(account);
-    setIsEditModalVisible(true);
+  const handleEditAccount = async (account) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/account/${account.userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log(response.data);
+      setSelectedAccount(response.data);
+      setIsEditModalVisible(true);
+    } catch (err) {
+      console.error('Error fetching account details:', err);
+      Alert.alert('Error', 'Failed to fetch account details. Please try again.');
+    }
   };
 
-  const handleSaveAccount = (editedAccount) => {
-    setAccounts(accounts.map(account => 
-      account.id === editedAccount.id ? editedAccount : account
-    ));
-    setIsEditModalVisible(false);
+  const handleSaveAccount = async (editedAccount) => {
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('No access token found');
+      }
+      console.log(editedAccount)
+
+      // Ensure that editedAccount.user._id is a valid ObjectId
+      if (!editedAccount.user._id) {
+        throw new Error('Invalid user ID');
+      }
+
+      const response = await axios.patch(
+        `${API_BASE_URL}/account/${editedAccount.user._id}`,
+        {
+          email: editedAccount.user.email,
+          username: editedAccount.user.username,
+          firstname: editedAccount.user.firstname,
+
+          education: editedAccount.education
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data && response.data.user) {
+        setAccounts(accounts.map(account =>
+          account.userId === editedAccount.user._id ? { ...account, ...response.data.user } : account
+        ));
+        setIsEditModalVisible(false);
+        Alert.alert('Success', 'Account updated successfully');
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (err) {
+      console.error('Error updating account:', err);
+      if (err.response && err.response.data && err.response.data.error) {
+        Alert.alert('Error', err.response.data.error);
+      } else {
+        Alert.alert('Error', 'Failed to update account. Please try again.');
+      }
+    }
   };
+  if (isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color={Colors.cobaltblue} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={styles.retryButton} onPress={() => fetchAccounts(selectedType)}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -71,16 +169,21 @@ export default function ManageAccountScreen() {
       <Text style={styles.sectionTitle}>{selectedType} Staff Accounts</Text>
 
       <FlatList
-        data={filteredAccounts}
+        data={accounts}
         renderItem={renderAccountItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.userId}
         style={styles.accountList}
       />
 
       <EditAccountModal
         isVisible={isEditModalVisible}
         account={selectedAccount}
-        onSave={handleSaveAccount}
+        onSave={(updatedAccount) => {
+          setAccounts(accounts.map(account =>
+            account.userId === updatedAccount._id ? { ...account, ...updatedAccount } : account
+          ));
+          setIsEditModalVisible(false);
+        }}
         onClose={() => setIsEditModalVisible(false)}
       />
     </View>
@@ -91,6 +194,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    backgroundColor: Colors.lgray,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: Colors.lgray,
   },
   typeSelector: {
@@ -142,6 +251,21 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   editButtonText: {
+    color: Colors.white,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: Colors.cobaltblue,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
     color: Colors.white,
     fontWeight: 'bold',
   },

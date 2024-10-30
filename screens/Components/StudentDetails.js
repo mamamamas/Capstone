@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../constants/Colors';
-
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 const InfoItem = ({ label, value }) => (
     <View style={styles.infoContainer}>
         <Text style={styles.infoLabel}>{label}:</Text>
@@ -446,9 +446,55 @@ export default function StudentDetailsScreen({ route }) {
     const [assessmentId, setAssessmentId] = useState(null);
     useEffect(() => {
         fetchUserDetails();
+        updateStudentRecordWithGoogleData();
     }, [userId]);
 
+    const fetchGoogleProfileData = async () => {
+        try {
+            const userInfo = await GoogleSignin.getCurrentUser();
+            if (userInfo) {
+                const profileData = {
+                    firstName: userInfo.user.givenName,
+                    lastName: userInfo.user.familyName,
+                    email: userInfo.user.email,
+                    profilePic: userInfo.user.photo,
+                };
+                return profileData;
+            } else {
+                throw new Error('Google user not logged in');
+            }
+        } catch (error) {
+            console.error('Error fetching Google profile data:', error);
+            return null;
+        }
+    };
+    const updateStudentRecordWithGoogleData = async () => {
+        const googleProfileData = await fetchGoogleProfileData();
+        if (!googleProfileData) return;
 
+        try {
+            const token = await AsyncStorage.getItem('accessToken');
+            const response = await axios.post(
+                `http://192.168.1.9:3000/login/updateProfile`,
+                { ...googleProfileData, userId },
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.status === 200) {
+                console.log('Student profile updated successfully:', response.data);
+                // Optionally fetch updated profile data and set it in your state
+                setUserData(response.data);
+            } else {
+                console.error('Failed to update student profile');
+            }
+        } catch (error) {
+            console.error('Error updating student profile:', error);
+        }
+    };
 
 
 

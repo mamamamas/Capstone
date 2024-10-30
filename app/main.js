@@ -22,6 +22,7 @@ import AdminProfileScreen from '../screens/AdminProfileScreen';
 import CreateAccount from '../screens/CreateAccountScreen';
 import ManageAccountScreen from '../screens/ManageAccountScreen';
 import AnnouncementList from '@/screens/Components/AnnouncementList';
+
 const Stack = createNativeStackNavigator();
 
 export default function Main() {
