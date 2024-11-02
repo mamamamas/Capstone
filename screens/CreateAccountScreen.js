@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import Colors from '../constants/Colors';
 
-const CreateAccountScreen = () => {
+const CreateAccountScreen = ({ onClose }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
@@ -12,15 +12,11 @@ const CreateAccountScreen = () => {
   const handleCreateAccount = () => {
     // Logic to create account
     console.log('Account created:', { username, password, email, educationLevel });
-  };
-
-  const handleClose = () => {
-    // Logic to close the screen or navigate back
-    console.log('Close pressed');
+    onClose(); // Close the modal after creating the account
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Staff Account Creation</Text>
 
       <Text style={styles.label}>Username:</Text>
@@ -57,16 +53,15 @@ const CreateAccountScreen = () => {
           style={styles.picker}
         >
           <Picker.Item label="Select Education Level" value="" />
-          <Picker.Item label="High School" value="highSchool" />
-          <Picker.Item label="Bachelor's Degree" value="bachelors" />
-          <Picker.Item label="Master's Degree" value="masters" />
-          <Picker.Item label="Doctorate" value="doctorate" />
+          <Picker.Item label="JHS" value="jhs" />
+          <Picker.Item label="SHS" value="shs" />
+          <Picker.Item label="College" value="college" />
         </Picker>
       </View>
 
       <View style={styles.buttonContainer}>
         <Pressable
-          onPress={handleClose}
+          onPress={onClose}
           style={[styles.button, styles.closeButton]}
         >
           <Text style={styles.buttonText}>Close</Text>
@@ -78,13 +73,12 @@ const CreateAccountScreen = () => {
           <Text style={styles.buttonText}>Save</Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
     backgroundColor: Colors.white,
   },

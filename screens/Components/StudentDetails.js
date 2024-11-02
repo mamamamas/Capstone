@@ -598,7 +598,17 @@ export default function StudentDetailsScreen({ route }) {
         const token = await AsyncStorage.getItem('accessToken');
         try {
             let response;
+            const medicalInfoId = userData.assessment[0]?.medicalInfoId || userData.medical?._id;
+
+            // Check if medicalInfoId is available
+            if (!medicalInfoId) {
+                console.log('No medicalInfoId available');
+                Alert.alert('Error', 'No medical information ID available to save the assessment.');
+                return;
+            }
+
             if (editingAssessment) {
+                // Update existing assessment
                 const { medicalInfoId, originalDocument, ...updateData } = newAssessment;
                 response = await axios.patch(
                     `http://192.168.1.9:3000/medical/assessment/${editingAssessment._id}`,
@@ -622,7 +632,7 @@ export default function StudentDetailsScreen({ route }) {
                     `http://192.168.1.9:3000/medical/assessment`,
                     {
                         ...newAssessment,
-                        medicalInfoId: userData.assessment[0]?.medicalInfoId || userData.medicalInfo._id
+                        medicalInfoId
                     },
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
@@ -647,6 +657,7 @@ export default function StudentDetailsScreen({ route }) {
                     throw new Error('Unexpected response status');
                 }
             }
+
             setIsAddAssessmentModalVisible(false);
             setIsEditAssessmentModalVisible(false);
             setEditingAssessment(null);

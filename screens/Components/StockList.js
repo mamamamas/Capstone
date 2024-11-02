@@ -70,7 +70,7 @@ const StockList = ({
             onPress: async () => {
               try {
                 const token = await AsyncStorage.getItem('accessToken');
-                await axios.post('http://192.168.1.2:3000/stocks/edit', {
+                await axios.post('http://192.168.1.9:3000/stocks/edit', {
                   stockDeletion: [{ stockItemId }], // Sending stockItemId for deletion
                 }, {
                   headers: { Authorization: `Bearer ${token}` },
@@ -91,60 +91,37 @@ const StockList = ({
     };
 
     const openDeductionModal = () => {
-      setSelectedItem(item); // Set the selected stock item for deduction
-      setDeductionModalVisible(true); // Open the deduction modal
+      setSelectedItem(item);
+      setDeductionModalVisible(true);
     };
 
     return (
-      <Pressable onPress={() => openDeductionModal()}>
-        <View style={[styles.itemRow(isLowStock), isLowStock && { backgroundColor: statusColor === 'red' ? '#ffcccc' : '#fff' }]}>
-          <Text style={styles.productName}>{item.stockItemName}</Text>
-
-          {isEditing ? (
-            <TextInput
-              placeholder="Qty"
-              value={item.newQuantity || ''}
-              onChangeText={(value) => handleNewQuantityChange(index, value)}
-              keyboardType="numeric"
-              style={styles.textInput}
-            />
-          ) : (
-            <Text style={styles.textDisplay}>{item.totalCurrentQuantity || '0'}</Text>
-          )}
-
-          {isEditing ? (
-            <Pressable onPress={handleDatePress} style={styles.textInput}>
-              <Text>{isValidDate(item.expirationDate) ? item.expirationDate : 'Set Date'}</Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.textDisplay}>{isValidDate(item.expirationDate) ? item.expirationDate : 'N/A'}</Text>
-          )}
-
-          {datePickerVisible === index && (
-            <DateTimePicker
-              value={tempDate}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-            />
-          )}
-
-          <Text style={[styles.statusText(isLowStock), { color: statusColor }]}>
-            {stockStatus}
-          </Text>
-
-          {/* Modify the Deduct button to delete stock */}
-          {isEditing ? (
-            <Pressable style={styles.deductButton} onPress={() => handleDeleteStock(item.stockItemId, index)}>
-              <Icon name="delete" size={25} color="red" />
-            </Pressable>
-          ) : (
-            <Pressable style={styles.deductButton} onPress={openDeductionModal}>
-              <Icon name="edit" size={25} color="blue" />
-            </Pressable>
-          )}
-        </View>
-      </Pressable>
+      <View style={[styles.itemRow(isLowStock), isLowStock && { backgroundColor: statusColor === 'red' ? '#ffcccc' : '#fff' }]}>
+        <Text style={styles.productName}>{item.stockItemName}</Text>
+        {isEditing ? (
+          <TextInput
+            placeholder="Qty"
+            value={item.newQuantity || ''}
+            onChangeText={(value) => handleNewQuantityChange(index, value)}
+            keyboardType="numeric"
+            style={styles.textInput}
+          />
+        ) : (
+          <Text style={styles.textDisplay}>{item.totalCurrentQuantity || '0'}</Text>
+        )}
+        <Text style={[styles.statusText(isLowStock), { color: statusColor }]}>
+          {stockStatus}
+        </Text>
+        {isEditing ? (
+          <Pressable style={styles.deductButton} onPress={() => handleDeleteStock(item.stockItemId, index)}>
+            <Icon name="delete" size={25} color="red" />
+          </Pressable>
+        ) : (
+          <Pressable style={styles.deductButton} onPress={openDeductionModal}>
+            <Icon name="edit" size={25} color="blue" />
+          </Pressable>
+        )}
+      </View>
     );
   };
 
@@ -158,7 +135,7 @@ const StockList = ({
       const token = await AsyncStorage.getItem('accessToken');
 
       const response = await axios.post(
-        'http://192.168.1.2:3000/stocks/deduct', // Update with your backend URL
+        'http://192.168.1.9:3000/stocks/deduct', // Update with your backend URL
         {
           stockItemId: selectedItem.stockItemId, // Use the selected item for deduction
           deduction: parseInt(deductionAmount),  // Convert to number
@@ -225,6 +202,7 @@ const StockList = ({
           </View>
         </View>
       </Modal>
+
     </View>
   );
 };

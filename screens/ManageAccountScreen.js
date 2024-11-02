@@ -6,7 +6,7 @@ import Colors from '../constants/Colors';
 import EditAccountModal from '../screens/Components/EditAccountModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://192.168.1.9:3000/admin'; // Replace with your actual API base URL
+const API_BASE_URL = 'http://192.168.1.15:3000/admin'; // Replace with your actual API base URL
 const accountTypes = ['JHS', 'SHS', 'College'];
 
 export default function ManageAccountScreen() {

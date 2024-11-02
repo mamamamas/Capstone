@@ -35,7 +35,7 @@ export default function DetailedRequestScreen() {
         setUserRole(role);
         setUserId(id);
 
-        const response = await axios.get(`http://192.168.1.9:3000/requests/${requestId}`, {
+        const response = await axios.get(`http://192.168.1.15:3000/requests/${requestId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -62,7 +62,7 @@ export default function DetailedRequestScreen() {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.patch(`http://192.168.1.9:3000/requests/${requestId}`,
+      const response = await axios.patch(`http://192.168.1.15:3000/requests/${requestId}`,
         { status: newStatus, feedback },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -225,7 +225,8 @@ export default function DetailedRequestScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.lgray,
+    backgroundColor: Colors.gray,
+    marginTop: 65,
   },
   loadingContainer: {
     flex: 1,

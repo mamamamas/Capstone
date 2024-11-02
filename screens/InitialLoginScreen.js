@@ -69,7 +69,7 @@ const InitialLoginScreen = ({ navigation }) => {
       const idToken = userInfo.data.idToken; // Access the ID token directly
 
       if (idToken) {
-        const response = await axios.post('http://192.168.1.9:3000/login/auth/google', {
+        const response = await axios.post('http://192.168.1.15:3000/login/auth/google', {
           token: idToken,
         });
 
@@ -81,9 +81,13 @@ const InitialLoginScreen = ({ navigation }) => {
           // Store user data in AsyncStorage
           await storeUserData(id, token, role, firstname, username, profilePic);
 
+          if (role !== "student") {
+            navigation.navigate('AdminDasboard');
+          } else {
+            navigation.navigate('StudentHome'); s
+          }
 
 
-          navigation.navigate('StudentHome'); // Navigate to the StudentHome screen
         } else {
           setError('Backend authentication failed');
         }

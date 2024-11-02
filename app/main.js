@@ -22,7 +22,7 @@ import AdminProfileScreen from '../screens/AdminProfileScreen';
 import CreateAccount from '../screens/CreateAccountScreen';
 import ManageAccountScreen from '../screens/ManageAccountScreen';
 import AnnouncementList from '@/screens/Components/AnnouncementList';
-
+import StockScreen from '../screens/StockScreen';
 const Stack = createNativeStackNavigator();
 
 export default function Main() {
@@ -110,6 +110,7 @@ export default function Main() {
             <Stack.Screen name="Create Account" component={CreateAccount} options={{ title: 'Create Account', headerShown: true }} />
             <Stack.Screen name="Manage Account" component={ManageAccountScreen} options={{ title: 'Manage Account', headerShown: true }} />
             <Stack.Screen name="AnnouncementList" component={AnnouncementList} options={{ title: 'AnnouncementList', headerShown: true }} />
+            <Stack.Screen name="StockScreen" component={StockScreen} options={{ title: 'StockScreen', headerShown: true }} />
             <Stack.Screen
                 name="AdminHome"
                 component={AdminDrawer}
@@ -128,7 +129,7 @@ export default function Main() {
             <Stack.Screen
                 name="DetailedRequestScreen"
                 component={DetailedRequestScreen}
-                options={{ title: 'Request Details' }}
+                options={{ title: 'Request Details', headerShown: false }}
             />
         </Stack.Navigator>
     );

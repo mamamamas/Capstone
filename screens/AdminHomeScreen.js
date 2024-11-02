@@ -25,7 +25,7 @@ export default function AdminHomeScreen() {
   const [firstName, setFirstName] = useState('Admin');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
-
+  const [profilePic, setProfilePic] = useState(null);
   useEffect(() => {
     fetchUserName();
     fetchNotifications();
@@ -57,14 +57,30 @@ export default function AdminHomeScreen() {
 
   const fetchUserName = async () => {
     try {
-      const username = await AsyncStorage.getItem('username');
-      if (username !== null) {
-        setFirstName(username);
+      const storedFirstName = await AsyncStorage.getItem('firstname');
+      const storedProfilePic = await AsyncStorage.getItem('profilePic');
+
+      if (storedFirstName) {
+        setFirstName(storedFirstName);
+        setProfilePic(storedProfilePic); // Set the profile picture URL
+      } else {
+        const userInfo = await GoogleSignin.getCurrentUser();
+        if (userInfo) {
+          const googleName = userInfo.user.givenName || 'Student';
+          setFirstName(googleName);
+          await AsyncStorage.setItem('firstname', googleName);
+          // Assuming the profile picture URL is available in userInfo.user.photoUrl
+          if (userInfo.user.photo) {
+            setProfilePic(userInfo.user.photo); // Set profile picture from Google
+            await AsyncStorage.setItem('profilePic', userInfo.user.photo); // Save to AsyncStorage
+          }
+        }
       }
     } catch (error) {
-      console.error('Error fetching username:', error);
+      console.error('Error fetching user name:', error);
     }
   };
+
 
   const fetchNotifications = async () => {
     try {
@@ -256,7 +272,9 @@ export default function AdminHomeScreen() {
       <View style={styles.header}>
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeText}>Welcome,</Text>
-          <Text style={styles.usernameText}>{firstName}</Text>
+          <Pressable onPress={() => navigation.navigate('AdminProfileScreen')}>
+            <Text style={styles.usernameText}>{firstName}</Text>
+          </Pressable>
         </View>
         <View style={styles.iconContainer}>
           <Pressable onPress={handleNotificationPress} style={styles.notificationIconContainer}>
@@ -268,9 +286,12 @@ export default function AdminHomeScreen() {
             />
             {hasUnreadNotifications && <View style={styles.notificationBadge} />}
           </Pressable>
-          <Pressable onPress={() => navigation.navigate('AdminProfileScreen')}>
+          <Pressable onPress={async () => {
+            const userId = await AsyncStorage.getItem('id');
+            navigation.navigate('StudentProfileScreen', { userId });
+          }}>
             <Image
-              source={require('../assets/default-profile-pic.png')}
+              source={profilePic ? { uri: profilePic } : require('../assets/default-profile-pic.png')}
               style={styles.profilePic}
             />
           </Pressable>

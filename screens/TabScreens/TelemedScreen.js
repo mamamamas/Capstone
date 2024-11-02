@@ -16,7 +16,7 @@ export default function TelehealthRequests() {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get('http://192.168.1.10:3000/requests', {
+      const response = await axios.get('http://192.168.1.15:3000/requests', {
         headers: {
           'Authorization': `Bearer ${token}`
         }

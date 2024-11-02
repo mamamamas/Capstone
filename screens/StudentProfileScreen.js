@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Modal, TextInput, Alert, Switch } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, PermissionsAndroid, ActivityIndicator, Modal, TextInput, Alert, Switch, Button, Pressable } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const API_BASE_URL = 'http://192.168.1.9:3000'; // Replace with your actual API base URL
+import Ionicons from 'react-native-vector-icons/Ionicons'; // or any icon library you're using
 
+const API_BASE_URL = 'http://192.168.1.9:3000'; // Replace with your actual API base URL
+import * as ImagePicker from 'expo-image-picker';
 export default function Component({ route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,6 +19,28 @@ export default function Component({ route }) {
     fetchProfileData();
     fetchUserName()
   }, [userId]);
+
+  const requestCameraPermission = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: "Camera Permission",
+          message: "App needs access to your camera.",
+          buttonNeutral: "Ask Me Later",
+          buttonNegative: "Cancel",
+          buttonPositive: "OK",
+        }
+      );
+
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (err) {
+      console.warn(err);
+      return false; // Handle the error appropriately
+    }
+  };
+
+
   const fetchUserName = async () => {
     try {
 
@@ -46,11 +70,29 @@ export default function Component({ route }) {
         },
       });
 
-      setProfileData(response.data);
+      const user = response.data;
 
-      // Store the first name in AsyncStorage
-      if (response.data.personal?.firstName) {
-        await AsyncStorage.setItem('firstname', response.data.personal.firstName);
+
+
+      if (user.personal && user.personal.dateOfBirth) {
+        user.personal.dateOfBirth = formatDate(user.personal.dateOfBirth);
+        console.log("Formatted Date of Birth:", user.personal.dateOfBirth);
+      } else {
+        console.error("Date of Birth is undefined or null");
+      }
+
+
+      setProfileData(user);
+
+
+      if (user.pfp) {
+        setProfilePic(user.pfp);
+        await AsyncStorage.setItem('profilePic', user.pfp);
+      }
+
+
+      if (user.personal && user.personal.firstName) {
+        await AsyncStorage.setItem('firstname', user.personal.firstName);
       }
     } catch (err) {
       console.error('Error fetching profile data:', err);
@@ -59,7 +101,75 @@ export default function Component({ route }) {
       setLoading(false);
     }
   };
-  const handleSave = async (updatedPersonal, updatedMedical) => {
+
+
+  function formatDate(dateString) {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    const date = new Date(dateString);
+    const formattedDate = date.toLocaleDateString('en-US', options);
+
+    return formattedDate;
+  }
+
+
+  const pickImage = async () => {
+    const hasPermission = await requestCameraPermission(); // Request camera permission
+    if (!hasPermission) {
+      Alert.alert("Permission denied", "You need to allow camera access to use this feature.");
+      return; // Exit if permission is not granted
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    console.log(result);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      // Correctly extract the URI
+      const uri = result.assets[0].uri; // Get the URI from the assets array
+      uploadImage(uri); // Pass the correct URI to uploadImage
+    } else {
+      console.log("Image selection was canceled or no image was selected.");
+    }
+  };
+
+
+  const uploadImage = async (uri) => {
+    const formData = new FormData();
+    formData.append("image", {
+      uri,
+      name: `photo.jpg`,
+      type: `image/jpeg`, // Ensure the correct MIME type
+    });
+
+    console.log("Uploading image with URI:", uri); // Log the URI
+
+    try {
+      const token = await AsyncStorage.getItem('accessToken');
+      console.log("Token:", token); // Log the token
+      const response = await axios.post(`${API_BASE_URL}/user/profile/${userId}/photo`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log("Upload Response:", response.data); // Log the full response
+      setProfilePic(response.data.pfp);
+    } catch (error) {
+      console.error("Error uploading image:", error.message);
+      if (error.response) {
+        console.error("Response data:", error.response.data); // Log the response data
+        console.error("Response status:", error.response.status); // Log the response status
+      } else {
+        console.error("Error details:", error); // Log any additional error details
+      }
+    }
+  };
+  console.log(userId)
+  const handleSave = async (updatedPersonal, updatedMedical, updatedEducation) => {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
@@ -68,7 +178,8 @@ export default function Component({ route }) {
 
       await axios.patch(`${API_BASE_URL}/user/profiles/${userId}`, {
         personal: updatedPersonal,
-        medical: updatedMedical
+        medical: updatedMedical,
+        education: updatedEducation  // Add education data here
       }, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -88,7 +199,6 @@ export default function Component({ route }) {
       }
     }
   };
-
   async function fetchFullData(data) {
     if (typeof data === 'string') {
       // If data is just an ID, fetch the full data
@@ -130,6 +240,8 @@ export default function Component({ route }) {
 
   const { personal, medical, education, assessment, immunization } = profileData;
 
+  console.log(personal)
+
   const filterSensitiveInfo = (data) => {
     if (!data) return {};
     const filtered = { ...data };
@@ -143,14 +255,18 @@ export default function Component({ route }) {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        {profilePic ? (
-          <Image source={{ uri: profilePic }} style={styles.profilePicture} />
-        ) : (
-          <View style={styles.profilePicture}>
-            <Text style={styles.profileLetter}>{personal?.firstName?.[0] || 'U'}</Text>
-          </View>
-        )}
-
+        <View style={styles.profilePictureContainer}>
+          {profilePic ? (
+            <Image source={{ uri: profilePic }} style={styles.profilePicture} />
+          ) : (
+            <View style={styles.profilePicture}>
+              <Text style={styles.profileLetter}>U</Text>
+            </View>
+          )}
+          <Pressable style={styles.changeProfilePictureButton} onPress={pickImage}>
+            <Ionicons name="camera" size={24} color="white" />
+          </Pressable>
+        </View>
         <View style={styles.healthInfo}>
           <HealthMetric label="Weight" value={medical?.weight || 'N/A'} />
           <HealthMetric label="Height" value={medical?.height || 'N/A'} />
@@ -163,8 +279,8 @@ export default function Component({ route }) {
 
       <View style={styles.content}>
         <InfoSection title="Personal Information" data={filterSensitiveInfo(personal)} />
-        <InfoSection title="Education Information" data={filterSensitiveInfo(education)} />
-        <InfoSection title="Medical Information" data={filterSensitiveInfo(medical)} />
+        <InfoSection title="Education Information" data={filterSensitiveInfo(education)} isEducation />
+        <InfoSection title="Medical Information" data={filterSensitiveInfo(medical)} isMedical />
 
 
         {assessment && assessment.length > 0 && (
@@ -186,6 +302,83 @@ export default function Component({ route }) {
     </ScrollView>
   );
 }
+const personalLabelMapping = {
+  firstName: 'First Name',
+  lastName: 'Last Name',
+  age: 'Age',
+  dateOfBirth: 'Date of Birth',
+  sex: 'Gender',
+  civilStatus: 'Civil Status',
+  address: 'Address',
+  religion: 'Religion',
+  telNo: 'Telephone Number',
+  guardian: 'Guardian Name',
+  guardianAddress: 'Guardian Address',
+  guardianTelNo: 'Guardian Telephone Number',
+};
+const educationLabelMapping = {
+  educationLevel: 'Education Level',
+  yearlvl: 'Year Level',
+  section: 'Section',
+  department: 'Department',
+  strand: 'Strand',
+  course: 'Course',
+  schoolYear: 'School Year',
+};
+
+const medicalLabelMapping = {
+  respiratory: 'Respiratory System',
+  digestive: 'Digestive System',
+  nervous: 'Nervous System',
+  excretory: 'Excretory System',
+  endocrine: 'Endocrine System',
+  circulatory: 'Circulatory System',
+  skeletal: 'Skeletal System',
+  muscular: 'Muscular System',
+  reproductive: 'Reproductive System',
+  lymphatic: 'Lymphatic System',
+  psychological: 'Psychological State',
+  specifyPsychological: 'Specify Psychological Condition',
+  smoking: 'Smoking Status',
+  drinking: 'Drinking Status',
+  allergy: 'Allergy Information',
+  specificAllergy: 'Specific Allergy',
+  eyes: 'Eyes Examination',
+  ear: 'Ear Examination',
+  nose: 'Nose Examination',
+  throat: 'Throat Examination',
+  tonsils: 'Tonsils Examination',
+  teeth: 'Teeth Examination',
+  tongue: 'Tongue Examination',
+  neck: 'Neck Examination',
+  thyroids: 'Thyroid Examination',
+  cervicalGlands: 'Cervical Glands Examination',
+  chest: 'Chest Examination',
+  contour: 'Chest Contour',
+  heart: 'Heart Examination',
+  rate: 'Heart Rate',
+  rhythm: 'Heart Rhythm',
+  bp: 'Blood Pressure',
+  height: 'Height',
+  weight: 'Weight',
+  bmi: 'Body Mass Index',
+  lungs: 'Lung Examination',
+  abdomen: 'Abdomen Examination',
+  ABcontour: 'Abdominal Contour',
+  liver: 'Liver Examination',
+  spleen: 'Spleen Examination',
+  kidneys: 'Kidneys Examination',
+  extremities: 'Extremities Examination',
+  upperExtremities: 'Upper Extremities Examination',
+  lowerExtremities: 'Lower Extremities Examination',
+  bloodChemistry: 'Blood Chemistry',
+  cbc: 'Complete Blood Count',
+  urinalysis: 'Urinalysis',
+  fecalysis: 'Fecalysis',
+  chestXray: 'Chest X-ray',
+  others: 'Other Observations',
+};
+
 
 const HealthMetric = ({ label, value }) => (
   <View style={styles.metricContainer}>
@@ -194,24 +387,26 @@ const HealthMetric = ({ label, value }) => (
   </View>
 );
 
-const InfoSection = ({ title, data }) => (
+const InfoSection = ({ title, data, isMedical = false }) => (
   <View style={styles.infoSection}>
     <Text style={styles.infoTitle}>{title}</Text>
     <View style={styles.infoContent}>
       {Object.entries(data || {}).map(([key, value]) => (
         <Text key={key} style={styles.infoText}>
-          {`${key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`}
+          {`${(isMedical ? medicalLabelMapping[key] : personalLabelMapping[key]) || key}: ${typeof value === 'object' ? JSON.stringify(value) : value}`}
         </Text>
       ))}
     </View>
   </View>
 );
 
-const EditModal = ({ visible, personalInfo, medicalInfo, onClose, onSave }) => {
+
+
+const EditModal = ({ visible, personalInfo, medicalInfo, educationInfo, onClose, onSave }) => {
   const [editedPersonal, setEditedPersonal] = useState(personalInfo || {});
   const [editedMedical, setEditedMedical] = useState(medicalInfo || {});
   const [showDatePicker, setShowDatePicker] = useState(false);
-
+  const [editedEducation, setEditedEducation] = useState(educationInfo || {});
   useEffect(() => {
     setEditedPersonal(personalInfo || {});
     setEditedMedical(medicalInfo || {});
@@ -220,21 +415,147 @@ const EditModal = ({ visible, personalInfo, medicalInfo, onClose, onSave }) => {
   const handlePersonalChange = (key, value) => {
     setEditedPersonal(prev => ({ ...prev, [key]: value }));
   };
+  const handleEducationChange = (key, value) => {
+    setEditedEducation(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleMedicalChange = (key, value) => {
     setEditedMedical(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSave = () => {
-    onSave(editedPersonal, editedMedical);
+    onSave(editedPersonal, editedMedical, editedEducation);
   };
+
+  const renderEducationFields = () => {
+    const educationLevel = editedEducation.educationLevel;
+
+    return (
+      <>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Education Level:</Text>
+          <Picker
+            selectedValue={educationLevel}
+            onValueChange={(value) => handleEducationChange('educationLevel', value)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select" value="" />
+            <Picker.Item label="JHS" value="JHS" />
+            <Picker.Item label="SHS" value="SHS" />
+            <Picker.Item label="College" value="College" />
+          </Picker>
+        </View>
+
+        {educationLevel && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Year Level:</Text>
+            <Picker
+              selectedValue={editedEducation.yearlvl}
+              onValueChange={(value) => handleEducationChange('yearlvl', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select" value="" />
+              {educationLevel === 'JHS' && ['Grade 7', '8', '9', '10'].map(year => (
+                <Picker.Item key={year} label={year} value={year} />
+              ))}
+              {educationLevel === 'SHS' && ['Grade 11', '12'].map(year => (
+                <Picker.Item key={year} label={year} value={year} />
+              ))}
+              {educationLevel === 'College' && ['1', '2', '3', '4'].map(year => (
+                <Picker.Item key={year} label={year} value={year} />
+              ))}
+            </Picker>
+          </View>
+        )}
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Section:</Text>
+          <Picker
+            selectedValue={editedEducation.section}
+            onValueChange={(value) => handleEducationChange('section', value)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Select" value="" />
+            {['A', 'B', 'C', 'D', "STEM 11-1"].map(section => (
+              <Picker.Item key={section} label={section} value={section} />
+            ))}
+          </Picker>
+        </View>
+
+        {educationLevel === 'College' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Department:</Text>
+            <Picker
+              selectedValue={editedEducation.department}
+              onValueChange={(value) => handleEducationChange('department', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select" value="" />
+              {["CBAA", "CHTM", "COI", "CET", "CCJ", "COE", "CASSW", "CNAH"].map(dept => (
+                <Picker.Item key={dept} label={dept} value={dept} />
+              ))}
+            </Picker>
+          </View>
+        )}
+
+        {educationLevel === 'SHS' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Strand:</Text>
+            <Picker
+              selectedValue={editedEducation.strand}
+              onValueChange={(value) => handleEducationChange('strand', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select" value="" />
+              {["STEM", "HUMMS", "ABM", "TVL-ICT", "TVL-HE"].map(strand => (
+                <Picker.Item key={strand} label={strand} value={strand} />
+              ))}
+            </Picker>
+          </View>
+        )}
+
+        {educationLevel === 'College' && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Course:</Text>
+            <Picker
+              selectedValue={editedEducation.course}
+              onValueChange={(value) => handleEducationChange('course', value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Select" value="" />
+              {[
+                "BSBA", "BSA", "BSREM", "BSCA", "BSHM", "BSTM", "ACLM",
+                "BSIT", "BSCS", "BSCpE", "BMMA", "BSCE", "BSEE", "BSECE",
+                "BSIE", "BS Criminology", "BECE", "BEE", "BPE", "BSE",
+                "BA Psychology", "BA Broadcasting", "BA Political Science",
+                "BS Social Work", "BSN", "BSND"
+              ].map(course => (
+                <Picker.Item key={course} label={course} value={course} />
+              ))}
+            </Picker>
+          </View>
+        )}
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>School Year:</Text>
+          <TextInput
+            style={styles.input}
+            value={editedEducation.schoolYear || ''}
+            onChangeText={(text) => handleEducationChange('schoolYear', text)}
+            placeholder="Enter School Year"
+          />
+        </View>
+      </>
+    );
+  };
+
 
   const renderPersonalFields = () => {
     const fields = [
       { key: 'firstName', label: 'First Name' },
       { key: 'lastName', label: 'Last Name' },
       { key: 'sex', label: 'Sex', type: 'picker', options: ['Male', 'Female', 'Other'] },
-      { key: 'civilStatus', label: 'Civil Status', type: 'picker', options: ['Single', 'Married', 'Divorced', 'Widowed'] },
+      { key: 'civil Status', label: 'Civil Status', type: 'picker', options: ['Single', 'Married', 'Divorced', 'Widowed'] },
       { key: 'dateOfBirth', label: 'Birthdate', type: 'date' },
       { key: 'address', label: 'Address' },
       { key: 'telNo', label: 'Tel. No.' },
@@ -323,6 +644,9 @@ const EditModal = ({ visible, personalInfo, medicalInfo, onClose, onSave }) => {
             <Text style={styles.modalTitle}>Edit Personal Information</Text>
             {renderPersonalFields()}
 
+            <Text style={styles.modalTitle}>Edit Education Information</Text>
+            {renderEducationFields()}
+
             <Text style={styles.modalTitle}>Edit Medical Information</Text>
             {renderMedicalFields()}
           </ScrollView>
@@ -382,6 +706,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
     marginBottom: 20,
+    marginTop: 20,
   },
   metricContainer: {
     alignItems: 'center',
@@ -514,5 +839,29 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  profilePictureContainer: {
+    position: 'relative', // Make this position relative to allow absolute positioning of the icon
+    alignItems: 'center', // Center the content
+    justifyContent: 'center',
+  },
+  profilePicture: {
+    width: 100, // Adjust the size as needed
+    height: 100,
+    borderRadius: 50, // Make it circular
+  },
+  profileLetter: {
+    fontSize: 40, // Size of the letter
+    color: 'white', // Text color
+    textAlign: 'center',
+    lineHeight: 100, // Center the text vertically
+  },
+  changeProfilePictureButton: {
+    position: 'absolute',
+    bottom: 10, // Position it slightly above the bottom of the profile picture
+    right: 10, // Position it on the right side
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background for the button
+    borderRadius: 20,
+    padding: 5, // Add some padding
   },
 });

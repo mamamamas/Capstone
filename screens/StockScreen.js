@@ -24,20 +24,20 @@ const StockScreen = () => {
         const token = await AsyncStorage.getItem('accessToken');
 
         // Fetch data based on the selected tab (Medicine, Supplies, Equipment)
-        const response = await axios.get(`http://192.168.1.2:3000/stocks/${selectedTab}`, {
+        const response = await axios.get(`http://192.168.1.9:3000/stocks/${selectedTab}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-
+        console.log(response.data)
         const stockData = response.data.map(item => ({
           stockItemId: item.stockItemId,
           stockItemName: item.stockItemName,
           newQuantity: item.newStockQty ? item.newStockQty.toString() : '',
-          expirationDate: item.newStockExp ? item.newStockExp.toString() : '',
           totalCurrentQuantity: item.totalCurrentQuantity,
           status: item.status,
         }));
+
 
         setStock(stockData);
 
@@ -158,7 +158,7 @@ const StockScreen = () => {
       const token = await AsyncStorage.getItem('accessToken');
 
       // Send the POST request with the correct headers
-      await axios.post('http://192.168.1.2:3000/stocks/edit', {
+      await axios.post('http://192.168.1.9:3000/stocks/edit', {
         stockUpdate,
       }, {
         headers: {
@@ -230,7 +230,7 @@ const StockScreen = () => {
       <ScrollView horizontal>
         <View>
           <View style={styles.headerRow}>
-            {['Product Name', 'Current Quantity', 'Expiration Date', 'Status', 'Action'].map((header) => (
+            {['Product Name', 'Current Quantity', 'Status', 'Action'].map((header) => (
               <Text key={header} style={styles.headerText}>{header}</Text>
             ))}
           </View>

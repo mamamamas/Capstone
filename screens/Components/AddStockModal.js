@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AddStockModal({ visible, onClose, onAdd }) {
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('medicine');
+  const [category, setCategory] = useState('Medicine');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAdd = async () => {
@@ -20,7 +20,7 @@ export default function AddStockModal({ visible, onClose, onAdd }) {
     setIsLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.post('http://192.168.1.9:3000/stocks/item', {
+      const response = await axios.post('http://192.168.1.15:3000/stocks/item', {
         addItemName: name,
         category,
       }, {
