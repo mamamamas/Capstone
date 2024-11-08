@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from 'react-native-vector-icons/Ionicons'; // or any icon library you're using
-
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 const API_BASE_URL = 'http://192.168.1.9:3000'; // Replace with your actual API base URL
 import * as ImagePicker from 'expo-image-picker';
 export default function Component({ route }) {
@@ -72,7 +72,7 @@ export default function Component({ route }) {
 
       const user = response.data;
 
-
+      console.log('Fetched user data:', JSON.stringify(response.data, null, 2));
 
       if (user.personal && user.personal.dateOfBirth) {
         user.personal.dateOfBirth = formatDate(user.personal.dateOfBirth);

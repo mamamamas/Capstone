@@ -23,25 +23,27 @@ export default function AdminLoginScreen({ navigation }) {
     //     return Object.keys(errors).length === 0;
     // };
 
-    const storeUserData = async (id, accessToken, role, firstname, username) => {
+    const storeUserData = async (userData) => {
         try {
+            const { id, accessToken, role, firstname, username, pfp } = userData;
             await AsyncStorage.setItem('id', id);
             await AsyncStorage.setItem('accessToken', accessToken);
             await AsyncStorage.setItem('role', role);
             await AsyncStorage.setItem('firstname', firstname);
             await AsyncStorage.setItem('username', username);
-            console.log('User data saved', firstname);
+            if (pfp) {
+                await AsyncStorage.setItem('profilePic', pfp);
+            }
+            console.log('User data saved', { firstname, pfp });
         } catch (error) {
             console.error('Error saving user data:', error);
         }
     };
 
     const handleSubmit = async () => {
-
         try {
             await AsyncStorage.removeItem('googleId');
             await AsyncStorage.removeItem('name');
-
 
             const response = await axios.post('http://192.168.1.9:3000/user/login', {
                 email,
@@ -49,18 +51,15 @@ export default function AdminLoginScreen({ navigation }) {
             });
 
             if (response.status === 200) {
-                const { id, accessToken, role, firstname, username } = response.data;
-                console.log('Login successful:', { id, email, role, username });
+                const userData = response.data;
+                console.log('Login successful:', userData);
                 Alert.alert('Success', 'Login successful!');
 
-                // const credentials = Realm.Credentials.jwt(accessToken);
-                // await app.logIn(credentials);
+                await storeUserData(userData);
 
-                await storeUserData(id, accessToken, role, firstname, username);
-
-                if (role === 'admin' || role === 'staff') {
+                if (userData.role === 'admin' || userData.role === 'staff') {
                     navigation.navigate('AdminDasboard');
-                } else if (role === 'student' || role === 'user') {
+                } else if (userData.role === 'student' || userData.role === 'user') {
                     navigation.navigate('StudentHome');
                 }
 
@@ -76,9 +75,7 @@ export default function AdminLoginScreen({ navigation }) {
             setEmail('');
             setPassword('');
         }
-
     };
-
     const handleGoogleLogin = async () => {
         try {
             // Open the Google login URL

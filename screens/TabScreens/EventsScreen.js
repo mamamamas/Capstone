@@ -40,7 +40,7 @@ export default function EventsScreen() {
   const fetchEvents = async () => {
     const token = await AsyncStorage.getItem('accessToken');
     try {
-      const response = await axios.get("http://192.168.1.15:3000/event", {
+      const response = await axios.get("http://192.168.1.9:3000/event", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -86,7 +86,7 @@ export default function EventsScreen() {
   const toggleAttendance = async (eventId) => {
     const token = await AsyncStorage.getItem('accessToken');
     try {
-      const response = await axios.post(`http://192.168.1.15:3000/event/${eventId}/attend`, {}, {
+      const response = await axios.post(`http://192.168.1.9:3000/event/${eventId}/attend`, {}, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -123,7 +123,7 @@ export default function EventsScreen() {
     const token = await AsyncStorage.getItem('accessToken');
     console.log(token);
     try {
-      const response = await axios.post("http://192.168.1.15:3000/event", newEvent, {
+      const response = await axios.post("http://192.168.1.9:3000/event", newEvent, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -141,7 +141,7 @@ export default function EventsScreen() {
   const editEvent = async () => {
     const token = await AsyncStorage.getItem('accessToken');
     try {
-      const response = await axios.patch(`http://192.168.1.15:3000/event/${editingEvent._id}`, editingEvent, {
+      const response = await axios.patch(`http://192.168.1.9:3000/event/${editingEvent._id}`, editingEvent, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -169,7 +169,7 @@ export default function EventsScreen() {
           onPress: async () => {
             const token = await AsyncStorage.getItem('accessToken');
             try {
-              await axios.delete(`http://192.168.1.15:3000/event/${eventId}`, {
+              await axios.delete(`http://192.168.1.9:3000/event/${eventId}`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },

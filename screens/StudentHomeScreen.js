@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, BackHandler, ToastAndroid, StyleSheet, Image, Pressable, Text, Modal, FlatList } from 'react-native';
+import { View, BackHandler, ToastAndroid, StyleSheet, Image, Pressable, Text, Modal, Alert, FlatList } from 'react-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -38,10 +38,10 @@ const StudentHomeContent = ({ navigation }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
     fetchUserName();
     fetchNotifications();
-    fetchAnnouncements();
 
     const backAction = () => {
       if (backPressCount === 0) {
@@ -106,22 +106,6 @@ const StudentHomeContent = ({ navigation }) => {
     }
   };
 
-  const fetchAnnouncements = async () => {
-    setIsRefreshing(true);
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/admin/posts/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const sortedAnnouncements = response.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      setAnnouncements(sortedAnnouncements);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-      ToastAndroid.show('Failed to load announcements', ToastAndroid.SHORT);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const handleCancelExit = () => {
     setShowExitDialog(false);
@@ -261,17 +245,12 @@ const StudentHomeContent = ({ navigation }) => {
         />
       </View>
 
+
       <AnnouncementList
-        announcements={announcements}
         isStudent={true}
         onItemPress={(item) => {
           console.log('Viewing announcement:', item);
         }}
-        onRefresh={() => {
-          setIsRefreshing(true);
-          fetchAnnouncements();
-        }}
-        refreshing={isRefreshing}
       />
 
       <ExitDialog

@@ -35,11 +35,12 @@ export default function DetailedRequestScreen() {
         setUserRole(role);
         setUserId(id);
 
-        const response = await axios.get(`http://192.168.1.15:3000/requests/${requestId}`, {
+        const response = await axios.get(`http://192.168.1.9:3000/requests/${requestId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
+        console.log(response.data);
         console.log('API Response:', JSON.stringify(response.data, null, 2));
         setRequest(response.data);
         setStatus(response.data.appointment.status);
@@ -62,7 +63,7 @@ export default function DetailedRequestScreen() {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.patch(`http://192.168.1.15:3000/requests/${requestId}`,
+      const response = await axios.patch(`http://192.168.1.9:3000/requests/${requestId}`,
         { status: newStatus, feedback },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -150,7 +151,7 @@ export default function DetailedRequestScreen() {
 
       <Text style={styles.title}>{request?.appointment?.formName}</Text>
       <View style={styles.content}>
-        <Text style={styles.label}>Sender: <Text style={styles.text}>{request?.userDetails?.firstName} {request?.userDetails?.lastName}</Text></Text>
+        <Text style={styles.label}>Sender: <Text style={styles.text}>{request?.userDetails?.firstname} {request?.userDetails?.lastname}</Text></Text>
         <Text style={styles.label}>Consultation Type: <Text style={styles.text}>{request?.appointment?.formName}</Text></Text>
         <Text style={styles.label}>{reasonLabel} <Text style={styles.text}>{request?.appointment?.reason || 'N/A'}</Text></Text>
         <Text style={styles.label}>{dateTimeLabel} <Text style={styles.text}>{new Date(request?.appointment?.timestamp).toLocaleString()}</Text></Text>

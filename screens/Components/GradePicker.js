@@ -5,7 +5,7 @@ import { Picker } from '@react-native-picker/picker';
 const grades = {
   JHS: ['Grade 7', '8', '9', '10'],
   SHS: ['11', '12'],
-  College: ['1st Year', '2nd Year', '3rd Year', '4th Year'],
+  College: ['1st Year', '2nd Year', '3rd Year', '4'],
 };
 
 const GradePicker = ({ selectedCategory, selectedGrade, onSelectGrade }) => {

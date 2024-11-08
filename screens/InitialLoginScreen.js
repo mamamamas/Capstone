@@ -37,14 +37,14 @@ const InitialLoginScreen = ({ navigation }) => {
       scopes: ['email', 'profile'],
     });
   }, []);
-  const storeUserData = async (id, accessToken, role, firstname, username, profilePic) => {
+  const storeUserData = async (id, accessToken, role, firstname, username, pfp) => {
     try {
       await AsyncStorage.setItem('id', id);
       await AsyncStorage.setItem('accessToken', accessToken);
       await AsyncStorage.setItem('role', role);
       await AsyncStorage.setItem('firstname', firstname || 'Student');
       await AsyncStorage.setItem('username', username);
-      await AsyncStorage.setItem('profilePic', profilePic); // Save profile picture URL
+      await AsyncStorage.setItem('profilePic', pfp); // Save profile picture URL
 
       console.log('User data stored successfully');
     } catch (error) {
@@ -69,22 +69,22 @@ const InitialLoginScreen = ({ navigation }) => {
       const idToken = userInfo.data.idToken; // Access the ID token directly
 
       if (idToken) {
-        const response = await axios.post('http://192.168.1.15:3000/login/auth/google', {
+        const response = await axios.post('http://192.168.1.9:3000/login/auth/google', {
           token: idToken,
         });
 
         console.log("Backend Response:", response.data);
 
         if (response.data.success) {
-          const { token, role, firstname, username, id, profilePic } = response.data;
+          const { token, role, firstname, username, id, pfp } = response.data;
 
           // Store user data in AsyncStorage
-          await storeUserData(id, token, role, firstname, username, profilePic);
+          await storeUserData(id, token, role, firstname, username, pfp);
 
           if (role !== "student") {
             navigation.navigate('AdminDasboard');
           } else {
-            navigation.navigate('StudentHome'); s
+            navigation.navigate('StudentHome');
           }
 
 

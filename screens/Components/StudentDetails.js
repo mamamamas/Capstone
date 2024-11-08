@@ -345,6 +345,7 @@ const EditProfileModal = ({ visible, onClose, student, onSave }) => {
 
 const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
     const [values, setValues] = useState(initialValues);
+    const [isScanning, setIsScanning] = useState(false);
 
     useEffect(() => {
         setValues(initialValues);
@@ -355,18 +356,27 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
         onClose();
     };
 
-    const calculateBMI = () => {
-        const height = parseFloat(values.height);
-        const weight = parseFloat(values.weight);
-        if (height && weight) {
-            const bmi = (weight / ((height / 100) * (height / 100))).toFixed(2);
-            setValues({ ...values, bmi });
+    const handleScan = async () => {
+        setIsScanning(true);
+        try {
+            const response = await fetch(`http://192.168.1.9:3000/weight/bmi`);
+            const data = await response.json();
+            if (data.weight && data.height && data.bmi) {
+                setValues({
+                    weight: data.weight.toString(),
+                    height: data.height.toString(),
+                    bmi: data.bmi.toString()
+                });
+            } else {
+                Alert.alert('Error', 'Failed to get weight, height, and BMI data');
+            }
+        } catch (error) {
+            console.error('Error scanning BMI:', error);
+            Alert.alert('Error', 'Failed to scan BMI. Please try again.');
+        } finally {
+            setIsScanning(false);
         }
     };
-
-    useEffect(() => {
-        calculateBMI();
-    }, [values.height, values.weight]);
 
     return (
         <Modal
@@ -379,23 +389,21 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
                 <View style={styles.modalView}>
                     <Text style={styles.modalTitle}>Scan BMI</Text>
                     <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Height:</Text>
+                        <Text style={styles.inputLabel}>Height (cm):</Text>
                         <TextInput
                             style={styles.input}
-                            onChangeText={(text) => setValues({ ...values, height: text })}
                             value={values.height}
-                            keyboardType="numeric"
-                            placeholder="Enter height in cm"
+                            editable={false}
+                            placeholder="Height will be scanned"
                         />
                     </View>
                     <View style={styles.inputContainer}>
-                        <Text style={styles.inputLabel}>Weight:</Text>
+                        <Text style={styles.inputLabel}>Weight (kg):</Text>
                         <TextInput
                             style={styles.input}
-                            onChangeText={(text) => setValues({ ...values, weight: text })}
                             value={values.weight}
-                            keyboardType="numeric"
-                            placeholder="Enter weight in kg"
+                            editable={false}
+                            placeholder="Weight will be scanned"
                         />
                     </View>
                     <View style={styles.inputContainer}>
@@ -404,6 +412,7 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
                             style={styles.input}
                             value={values.bmi}
                             editable={false}
+                            placeholder="BMI will be calculated"
                         />
                     </View>
                     <View style={styles.buttonContainer}>
@@ -412,6 +421,13 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
                             onPress={onClose}
                         >
                             <Text style={styles.buttonTextClose}>Close</Text>
+                        </Pressable>
+                        <Pressable
+                            style={[styles.button, styles.buttonScan]}
+                            onPress={handleScan}
+                            disabled={isScanning}
+                        >
+                            <Text style={styles.buttonTextScan}>{isScanning ? 'Scanning...' : 'Scan BMI'}</Text>
                         </Pressable>
                         <Pressable
                             style={[styles.button, styles.buttonAdd]}
@@ -425,7 +441,6 @@ const ScanBMIModal = ({ visible, onClose, onSave, initialValues = {} }) => {
         </Modal>
     );
 };
-
 export default function StudentDetailsScreen({ route }) {
     const { userId } = route.params;
     const [userData, setUserData] = useState(null);
@@ -444,6 +459,8 @@ export default function StudentDetailsScreen({ route }) {
     const [isEditAssessmentModalVisible, setIsEditAssessmentModalVisible] = useState(false);
     const [shouldRefreshFollowUps, setShouldRefreshFollowUps] = useState(false);
     const [assessmentId, setAssessmentId] = useState(null);
+    const [profile, setprofile] = useState(null);
+
     useEffect(() => {
         fetchUserDetails();
         updateStudentRecordWithGoogleData();
@@ -516,18 +533,17 @@ export default function StudentDetailsScreen({ route }) {
             if (response.status === 200 && response.data) {
                 console.log('Fetched user data:', JSON.stringify(response.data, null, 2));
                 setUserData(response.data);
-                return response.data;
             } else {
                 throw new Error('Unexpected response from server');
             }
         } catch (err) {
             console.error('Failed to load user details', err);
             setError('Failed to load user details');
-            return null;
         } finally {
             setLoading(false);
         }
     };
+
 
     const fetchArchiveData = async () => {
         try {
@@ -724,6 +740,7 @@ export default function StudentDetailsScreen({ route }) {
             }
         }
     };
+    console.log(userData.pfp)
 
     const handleSaveImmunization = async (newImmunization) => {
         const token = await AsyncStorage.getItem('accessToken');
@@ -756,6 +773,14 @@ export default function StudentDetailsScreen({ route }) {
                         item._id === immunizationId ? response.data : item // Compare by _id instead of index
                     )
                 }));
+                Alert.alert('Success', 'Follow-up saved successfully.', [
+                    {
+                        text: 'OK',
+                        onPress: () => {
+                            fetchUserDetails(); // Refresh user data and assessments
+                        },
+                    },
+                ]);
             } else {
                 response = await axios.post(
                     `${baseUrl}/immunization`,
@@ -902,7 +927,7 @@ export default function StudentDetailsScreen({ route }) {
     const handleSaveBMI = async (bmiData) => {
         const token = await AsyncStorage.getItem('accessToken');
         try {
-            const response = await axios.put(`http://192.168.1.10:3000/user/${userId}/bmi`, bmiData, {
+            const response = await axios.put(`http://192.168.1.9:3000/weight/${userId}/bmi`, bmiData, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUserData(prevData => ({
@@ -915,12 +940,12 @@ export default function StudentDetailsScreen({ route }) {
                 }
             }));
             setIsScanBMIModalVisible(false);
+            Alert.alert('Success', 'BMI data updated successfully');
         } catch (error) {
             console.error('Error updating BMI:', error);
             Alert.alert('Error', 'Failed to update BMI');
         }
     };
-    console.log
 
     const renderArchiveChanges = (changes, title) => (
         <View>
@@ -967,9 +992,10 @@ export default function StudentDetailsScreen({ route }) {
             <ScrollView style={styles.container}>
                 <View style={styles.header}>
                     <Image
-                        source={userData.profilePic ? { uri: userData.profilePic } : require('../../assets/default-profile-pic.png')}
+                        source={userData?.pfp ? { uri: userData.pfp } : require('../../assets/default-profile-pic.png')}
                         style={styles.avatar}
                     />
+
                     <Text style={styles.title}>{`${userData.personal.firstName} ${userData.personal.lastName}`}</Text>
                     <View style={styles.profileButtons}>
                         <Pressable
@@ -986,6 +1012,7 @@ export default function StudentDetailsScreen({ route }) {
                         </Pressable>
                     </View>
                 </View>
+
 
                 <SectionCard title="Personal Information">
                     <InfoItem label="Education Level" value={userData.education.yearlvl} />
@@ -1137,8 +1164,7 @@ export default function StudentDetailsScreen({ route }) {
                         data={userData?.immunization?.map((immun, index) => ({
                             date: new Date(immun.timestamp).toLocaleDateString(),
                             vaccine: immun.vaccine,
-                            remarks: immun.remarks,
-                            index // Include index to use it for editing
+                            remarks: immun.remarks
                         })) || []}
                         onEdit={(index) => handleEdit("Immunizations Administered", index)}
                     />

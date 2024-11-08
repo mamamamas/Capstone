@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Assuming Colors is imported from your constants
 import Colors from '../../constants/Colors';
 
-const API_BASE_URL = 'http://192.168.1.15:3000/admin'; // Replace with your actual API base URL
+const API_BASE_URL = 'http://192.168.1.9:3000/admin'; // Replace with your actual API base URL
 
 export default function EditAccountModal({ isVisible, account, onSave, onClose }) {
   const [editedAccount, setEditedAccount] = useState({

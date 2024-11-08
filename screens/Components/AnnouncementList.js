@@ -16,10 +16,12 @@ export default function AnnouncementList() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [body, setBody] = useState('');
+  const [userId, setUserId] = useState('');
 
   useEffect(() => {
     fetchUserRole();
+    fetchUserId();
     fetchAnnouncements();
   }, []);
 
@@ -33,15 +35,21 @@ export default function AnnouncementList() {
     }
   };
 
-  useEffect(() => {
-    console.log('isAdmin:', isAdmin);
-  }, [isAdmin]);
+  const fetchUserId = async () => {
+    try {
+      const id = await AsyncStorage.getItem('id');
+      setUserId(id);
+    } catch (error) {
+      console.error('Error fetching user ID:', error);
+    }
+  };
 
   const fetchAnnouncements = async () => {
     setIsLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${API}/admin/posts/all`, {
+      console.log(`Access token: ${token}`);
+      const response = await axios.get(`${API}/post`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const sortedAnnouncements = response.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -58,14 +66,14 @@ export default function AnnouncementList() {
   const handleAddPress = () => {
     setSelectedAnnouncement(null);
     setTitle('');
-    setContent('');
+    setBody('');
     setIsModalVisible(true);
   };
 
   const handleEditPress = (announcement) => {
     setSelectedAnnouncement(announcement);
     setTitle(announcement.title);
-    setContent(announcement.content);
+    setBody(announcement.body);
     setIsModalVisible(true);
   };
 
@@ -80,9 +88,13 @@ export default function AnnouncementList() {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('accessToken');
-              await axios.delete(`${API}/posts/delete/${announcement._id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              const response = await axios.post(`${API}/post/delete`, // Change to POST
+                { id: announcement._id },
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              console.log(response.data);
               fetchAnnouncements();
             } catch (error) {
               console.error('Error deleting announcement:', error);
@@ -93,20 +105,19 @@ export default function AnnouncementList() {
       ]
     );
   };
-
   const handleSave = async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
       if (selectedAnnouncement) {
-        await axios.patch(
-          `${API}/posts/edit/${selectedAnnouncement._id}`,
-          { title, content },
+        await axios.put(
+          `${API}/post/edit/${selectedAnnouncement._id}`,
+          { title, body },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         await axios.post(
-          `${API}/admin/posts`,
-          { title, content },
+          `${API}/post`,
+          { title, body, author: userId },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       }
@@ -122,7 +133,7 @@ export default function AnnouncementList() {
     <View style={styles.item}>
       <View style={styles.itemContent}>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.description}>{item.content}</Text>
+        <Text style={styles.description}>{item.body}</Text>
         <Text style={styles.timestamp}>
           Posted {moment(item.createdAt).fromNow()}
         </Text>
@@ -170,13 +181,14 @@ export default function AnnouncementList() {
         onClose={() => setIsModalVisible(false)}
         formFields={[
           { placeholder: 'Enter Title', value: title, onChangeText: setTitle },
-          { placeholder: 'Enter Content', value: content, onChangeText: setContent, isDescription: true },
+          { placeholder: 'Enter Body', value: body, onChangeText: setBody, isDescription: true },
         ]}
         onSave={handleSave}
       />
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

@@ -207,14 +207,22 @@ export default function ScheduleScreen() {
   const fetchEvents = useCallback(async () => {
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await fetch('http://192.168.1.15:3000/schedule', {
+      const response = await fetch('http://192.168.1.9:3000/schedule', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = await response.json();
       console.log(data);
       if (data.scheduleItems) {
-        setEvents(data.scheduleItems.map((item, index) => ({
+        const currentDate = moment();
+
+        // Filter out past events
+        const futureEvents = data.scheduleItems.filter(item => {
+          const end = moment(item.end || item.when?.endTime);
+          return end.isSameOrAfter(currentDate); // Include events that are still valid today
+        });
+
+        setEvents(futureEvents.map((item, index) => ({
           ...item,
           id: item.id || item._id || `event-${index}`, // Ensure there's always an ID
           start: moment(item.start).toDate(),
@@ -228,6 +236,7 @@ export default function ScheduleScreen() {
     }
   }, []);
 
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -240,7 +249,7 @@ export default function ScheduleScreen() {
   const handleAddEvent = useCallback(async () => {
     if (newEvent.title && newEvent.start && newEvent.end) {
       try {
-        const response = await fetch('http://192.168.1.15:3000/schedule', {
+        const response = await fetch('http://192.168.1.9:3000/schedule', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -293,16 +302,12 @@ export default function ScheduleScreen() {
   }, []);
 
 
-
   const markedDates = useMemo(() => {
     const marked = {};
-    const currentDate = moment();
     events.forEach(event => {
-      const startDate = moment(event.start);
-      const endDate = moment(event.end);
+      const startDate = moment(event.when?.startTime || event.start || event.appointmentDate);
+      const endDate = moment(event.when?.endTime || event.end || event.appointmentDate);
       const isMultiDay = !startDate.isSame(endDate, 'day');
-      const isCurrentEvent = startDate.isSame(currentDate, 'day') ||
-        (startDate.isBefore(currentDate, 'day') && endDate.isAfter(currentDate, 'day'));
 
       for (let date = startDate.clone(); date.isSameOrBefore(endDate, 'day'); date.add(1, 'day')) {
         const dateString = date.format('YYYY-MM-DD');
@@ -310,7 +315,7 @@ export default function ScheduleScreen() {
           marked[dateString] = { marked: true, dots: [] };
         }
         marked[dateString].dots.push({
-          color: isCurrentEvent ? '#0047AB' : '#4169E1', // Cobalt Blue for current, Royal Blue for upcoming
+          color: isMultiDay ? '#4169E1' : '#0047AB', // Royal Blue for multi-day, Cobalt Blue for single-day
           isMultiDay: isMultiDay,
           isStart: date.isSame(startDate, 'day'),
           isEnd: date.isSame(endDate, 'day')
@@ -319,6 +324,7 @@ export default function ScheduleScreen() {
     });
     return marked;
   }, [events]);
+
 
   const renderMonthView = useCallback(() => {
     const monthStart = currentDate.clone().startOf('month');
@@ -353,7 +359,7 @@ export default function ScheduleScreen() {
               const isToday = date.isSame(moment(), 'day');
               const isSelected = date.isSame(selectedDate, 'day');
               const dateString = date.format('YYYY-MM-DD');
-              const hasEvents = markedDates[dateString]?.marked;
+              const hasEvents = markedDates && markedDates[dateString]?.marked;
 
               return (
                 <TouchableOpacity
@@ -395,54 +401,54 @@ export default function ScheduleScreen() {
                 </TouchableOpacity>
               );
             })}
-
           </View>
         ))}
       </View>
     );
   }, [currentDate, selectedDate, markedDates, handleDateSelect]);
 
-  const renderDayView = useCallback(() => {
-    const dayEvents = events.filter(event =>
-      moment(event.start).isSameOrBefore(selectedDate, 'day') &&
-      moment(event.end).isSameOrAfter(selectedDate, 'day')
-    );
 
+
+
+  const renderDayView = useCallback(() => {
+    const normalizedSelectedDate = selectedDate.clone().startOf('day');
+
+    // Filter events for the selected date
+    const dayEvents = events.filter(event => {
+      const eventStart = moment(event.start || event.when?.startTime).startOf('day');
+      const eventEnd = event.end ? moment(event.end).startOf('day') : eventStart; // Use start if no end
+      return eventStart.isSame(normalizedSelectedDate, 'day') || eventEnd.isSame(normalizedSelectedDate, 'day');
+    });
+
+    // Time slots for each hour of the day
     const timeSlots = Array.from({ length: 24 }, (_, i) => i);
 
     return (
       <View style={styles.dayViewContainer}>
         <View style={styles.allDayEventsContainer}>
           {dayEvents.filter(event => {
-            const eventStart = moment(event.start);
-            const eventEnd = moment(event.end);
-            return !eventStart.isSame(eventEnd, 'day') &&
-              (eventStart.isBefore(selectedDate, 'day') || eventEnd.isAfter(selectedDate, 'day'));
+            const eventStart = moment(event.start).startOf('day');
+            const eventEnd = event.end ? moment(event.end).startOf('day') : eventStart;
+            return eventStart.isSame(normalizedSelectedDate, 'day') && eventStart.isBefore(eventEnd, 'day');
           }).map((event, index) => (
             <View key={index} style={[styles.allDayEvent, { backgroundColor: event.color }]}>
               <Text style={styles.allDayEventTitle}>{event.title}</Text>
               <Text style={styles.allDayEventTime}>
-                {moment(event.start).format('MMM D')} - {moment(event.end).format('MMM D')}
+                {moment(event.start).format('MMM D')} - {event.end ? moment(event.end).format('MMM D') : ""}
               </Text>
             </View>
           ))}
         </View>
+
         <FlatList
           data={timeSlots}
           keyExtractor={(item) => `timeslot-${item}`}
           renderItem={({ item: hour }) => {
-            const time = selectedDate.clone().hour(hour);
+            const time = normalizedSelectedDate.clone().hour(hour);
+
             const eventsAtTime = dayEvents.filter(event => {
-              const eventStart = moment(event.start);
-              const eventEnd = moment(event.end);
-              const isMultiDayEvent = !eventStart.isSame(eventEnd, 'day');
-
-              // For the current day, get the correct start and end hours
-              const startHour = selectedDate.isSame(eventStart, 'day') ? eventStart.hour() : 9; // Default to 9 AM
-              const endHour = selectedDate.isSame(eventEnd, 'day') ? eventEnd.hour() : 16; // Default to 4 PM
-
-              // Only show the event once at its start hour
-              return hour === startHour;
+              const eventStart = moment(event.start || event.when?.startTime);
+              return eventStart.isSame(normalizedSelectedDate, 'day') && eventStart.hour() === hour;
             });
 
             return (
@@ -450,11 +456,11 @@ export default function ScheduleScreen() {
                 <Text style={styles.timeText}>{time.format('h:mm A')}</Text>
                 <View style={styles.eventContainer}>
                   {eventsAtTime.map((event, index) => {
-                    const eventStart = moment(event.start);
-                    const eventEnd = moment(event.end);
-                    const isMultiDayEvent = !eventStart.isSame(eventEnd, 'day');
+                    const eventStart = moment(event.start || event.when?.startTime);
+                    const eventEnd = event.end ? moment(event.end) : eventStart.clone().add(15, 'minutes'); // Default 15 min duration if no end
 
-                    let height = HOUR_HEIGHT * 7; // Fixed height for 9 AM to 4 PM (7 hours)
+                    const durationHours = moment.duration(eventEnd.diff(eventStart)).asHours();
+                    const height = durationHours * HOUR_HEIGHT;
 
                     const iconName = event.icon === 'brain' ? 'brain' : (event.icon || 'calendar');
                     const IconComponent = event.icon === 'brain' ? FontAwesome5 : Ionicons;
@@ -464,22 +470,17 @@ export default function ScheduleScreen() {
                         styles.event,
                         {
                           backgroundColor: event.color,
-                          height,
-                          top: isMultiDayEvent ?
-                            (selectedDate.isSame(eventStart, 'day') ? (eventStart.minutes() / 60) * HOUR_HEIGHT : 0) :
-                            (eventStart.minutes() / 60) * HOUR_HEIGHT
+                          height: height > 0 ? height : 25,
+                          top: (eventStart.minutes() / 60) * HOUR_HEIGHT
                         }
                       ]}>
                         <IconComponent name={iconName} size={16} color="#fff" style={styles.eventIcon} />
                         <View style={styles.eventDetails}>
                           <Text style={styles.eventTitle}>{event.title}</Text>
                           <Text style={styles.eventTime}>
-                            {isMultiDayEvent
-                              ? `${eventStart.format('MMM D')} - ${eventEnd.format('MMM D')}`
-                              : `${eventStart.format('h:mm A')} - ${eventEnd.format('h:mm A')}`
-                            }
+                            {`${eventStart.format('h:mm A')} - ${eventEnd.format('h:mm A')}`}
                           </Text>
-                          {event.location && <Text style={styles.eventLocation}>{event.where}</Text>}
+                          {event.location && <Text style={styles.eventLocation}>{event.location}</Text>}
                           <Text style={styles.eventParticipants}>Max: {event.limit}</Text>
                           <Text style={styles.eventForWhom}>For: {event.who}</Text>
                         </View>
@@ -491,7 +492,7 @@ export default function ScheduleScreen() {
             );
           }}
           contentContainerStyle={styles.dayViewContent}
-          initialScrollIndex={6}
+          initialScrollIndex={6} // Start at a middle time like 6 AM
           getItemLayout={(data, index) => ({
             length: HOUR_HEIGHT,
             offset: HOUR_HEIGHT * index,
@@ -501,6 +502,8 @@ export default function ScheduleScreen() {
       </View>
     );
   }, [selectedDate, events]);
+
+
 
   const renderEventList = useCallback(({ item }) => {
     const iconName = item.icon === 'brain' ? 'brain' : (item.icon || 'calendar');
@@ -641,6 +644,21 @@ export default function ScheduleScreen() {
   ), [modalVisible, newEvent, handleAddEvent, showStartDatePicker, showEndDatePicker]);
 
   const renderContent = useCallback(() => {
+    const todayEvents = events.filter(event => {
+      const startTime = moment(event.when?.startTime || event.start);
+      const endTime = moment(event.when?.endTime || event.end);
+      return startTime.isSameOrBefore(moment(), 'day') && endTime.isSameOrAfter(moment(), 'day');
+    });
+
+    const upcomingEvents = events.filter(event => {
+      const startTime = moment(event.when?.startTime || event.start);
+      return startTime.isAfter(moment(), 'day');
+    });
+
+    // Debug logs to verify the filtered events
+    console.log("Today's Events:", todayEvents);
+    console.log("Upcoming Events:", upcomingEvents);
+
     return (
       <>
         <Animated.View style={[styles.monthView, { opacity: monthViewOpacity, display: view === 'month' ? 'flex' : 'none' }]}>
@@ -658,12 +676,9 @@ export default function ScheduleScreen() {
             <View style={styles.todayPlan}>
               <Text style={styles.sectionTitle}>Today's plan</Text>
               <FlatList
-                data={events.filter(event =>
-                  moment(event.start).isSameOrBefore(moment(), 'day') &&
-                  moment(event.end).isSameOrAfter(moment(), 'day')
-                )}
+                data={todayEvents}
                 renderItem={renderEventList}
-                keyExtractor={item => item.id.toString()} // Add this line
+                keyExtractor={item => item._id ? item._id.toString() : item.id.toString()}
                 ListEmptyComponent={<Text style={styles.noEventsText}>No events scheduled for today</Text>}
                 scrollEnabled={false}
               />
@@ -671,12 +686,9 @@ export default function ScheduleScreen() {
             <View style={styles.upcomingPlans}>
               <Text style={styles.sectionTitle}>Upcoming plans</Text>
               <FlatList
-                data={events.filter(event => {
-                  const startTime = getEventStartTime(event);
-                  return moment(startTime).isAfter(moment(), 'day');
-                })}
+                data={upcomingEvents}
                 renderItem={renderEventList}
-                keyExtractor={getEventKey}
+                keyExtractor={item => item._id ? item._id.toString() : item.id.toString()}
                 ListEmptyComponent={<Text style={styles.noEventsText}>No upcoming events</Text>}
                 scrollEnabled={false}
               />

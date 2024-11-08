@@ -45,7 +45,7 @@ const StudentRecordScreen = () => {
           '1st Year': ['BSCS 1A', 'BSCS 1B'],
           '2nd Year': ['BSCS 2A', 'BSCS 2B'],
           '3rd Year': ['BSCS 3A', 'BSCS 3B'],
-          '4th Year': ['BSCS 4A', 'BSCS 4B'],
+          '4': ['A', 'BSCS 4B'],
         },
         IT: {
           '1st Year': ['IT 1A', 'IT 1B'],

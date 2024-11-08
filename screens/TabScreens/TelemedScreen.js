@@ -16,11 +16,12 @@ export default function TelehealthRequests() {
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get('http://192.168.1.15:3000/requests', {
+      const response = await axios.get('http://192.168.1.9:3000/requests', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      console.log(response.data);
       setTelehealthRequests(response.data);
     } catch (error) {
       console.error('Error fetching telehealth requests:', error);
@@ -28,6 +29,17 @@ export default function TelehealthRequests() {
       setLoading(false);
     }
   }, []);
+
+  const formatDate = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -55,20 +67,24 @@ export default function TelehealthRequests() {
     telehealthRequests.map((request, index) => (
       <View key={index} style={[styles.tableRow, index % 2 === 0 ? styles.evenRow : styles.oddRow]}>
         <Text style={[styles.cell, styles.requestColumn]}>{request.formName}</Text>
-        <Text style={[styles.cell, styles.senderColumn]}>{request.userId}</Text>
+        <Text style={[styles.cell, styles.senderColumn]}>
+          {request?.userDetails?.firstName && request?.userDetails?.lastName
+            ? `${request.userDetails.firstName} ${request.userDetails.lastName}`
+            : 'N/A'}
+        </Text>
         <Text style={[styles.cell, styles.statusColumn, styles.statusApproved]}>{request.status}</Text>
         <View style={[styles.cell, styles.actionColumn]}>
           <Pressable style={styles.viewButton} onPress={() => handleViewPress(request)}>
             <Text style={styles.viewButtonText}>View</Text>
           </Pressable>
         </View>
-        <Text style={[styles.cell, styles.dateColumn]}>{request.timestamp}</Text>
+        <Text style={[styles.cell, styles.dateColumn]}>{formatDate(request.timestamp)}</Text>
         <Text style={[styles.cell, styles.handledByColumn]}>
-          {request.handledByDetails && request.handledByDetails.firstName
+          {request.handledBy && request.handledByDetails?.firstName && request.handledByDetails?.lastName
             ? `${request.handledByDetails.firstName} ${request.handledByDetails.lastName}`
-            : 'N/A'}
+            : 'Not assigned'}
         </Text>
-        <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback}</Text>
+        <Text style={[styles.cell, styles.feedbackColumn]}>{request.feedback || 'No feedback'}</Text>
       </View>
     ))
   );

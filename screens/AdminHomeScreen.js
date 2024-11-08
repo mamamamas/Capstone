@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import Banner from '../screens/Components/Banner';
 import AnnouncementList from '../screens/Components/AnnouncementList';
-import FormModal from '../screens/Components/FormModal';
 import ExitDialog from '../screens/Components/ExitDialog';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -15,21 +14,16 @@ const API_URL = 'http://192.168.1.9:3000';
 export default function AdminHomeScreen() {
   const navigation = useNavigation();
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [announcements, setAnnouncements] = useState([]);
-  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', description: '' });
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [backPressCount, setBackPressCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [firstName, setFirstName] = useState('Admin');
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [profilePic, setProfilePic] = useState(null);
+
   useEffect(() => {
-    fetchUserName();
+    fetchUserData();
     fetchNotifications();
-    fetchAnnouncements();
 
     const backAction = () => {
       if (backPressCount === 0) {
@@ -55,32 +49,32 @@ export default function AdminHomeScreen() {
     }, [])
   );
 
-  const fetchUserName = async () => {
+  const fetchUserData = async () => {
     try {
-      const storedFirstName = await AsyncStorage.getItem('firstname');
-      const storedProfilePic = await AsyncStorage.getItem('profilePic');
+      const userId = await AsyncStorage.getItem('id');
+      const token = await AsyncStorage.getItem('accessToken');
 
-      if (storedFirstName) {
-        setFirstName(storedFirstName);
-        setProfilePic(storedProfilePic); // Set the profile picture URL
-      } else {
-        const userInfo = await GoogleSignin.getCurrentUser();
-        if (userInfo) {
-          const googleName = userInfo.user.givenName || 'Student';
-          setFirstName(googleName);
-          await AsyncStorage.setItem('firstname', googleName);
-          // Assuming the profile picture URL is available in userInfo.user.photoUrl
-          if (userInfo.user.photo) {
-            setProfilePic(userInfo.user.photo); // Set profile picture from Google
-            await AsyncStorage.setItem('profilePic', userInfo.user.photo); // Save to AsyncStorage
-          }
+      if (userId && token) {
+        const response = await axios.get(`${API_URL}/user/profile/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const { personal, pfp } = response.data;
+
+        if (personal && personal.firstName) {
+          setFirstName(personal.firstName);
+          await AsyncStorage.setItem('firstname', personal.firstName);
+        }
+
+        if (pfp) {
+          setProfilePic(pfp);
+          await AsyncStorage.setItem('profilePic', pfp);
         }
       }
     } catch (error) {
-      console.error('Error fetching user name:', error);
+      console.error('Error fetching user data:', error);
     }
   };
-
 
   const fetchNotifications = async () => {
     try {
@@ -89,72 +83,10 @@ export default function AdminHomeScreen() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(response.data);
-      // Update the hasUnreadNotifications state
       setHasUnreadNotifications(response.data.some(notif => !notif.isRead));
-      return response.data;
     } catch (error) {
       console.error('Error fetching notifications:', error);
       ToastAndroid.show('Failed to load notifications', ToastAndroid.SHORT);
-      return [];
-    }
-  };
-
-
-  const fetchAnnouncements = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/admin/posts/all`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAnnouncements(response.data);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-      ToastAndroid.show('Failed to load announcements', ToastAndroid.SHORT);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const addAnnouncement = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      await axios.post(`${API_URL}/admin/posts`, newAnnouncement, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchAnnouncements();
-      setModalVisible(false);
-      setNewAnnouncement({ title: '', description: '' });
-    } catch (error) {
-      console.error('Error adding announcement:', error);
-      ToastAndroid.show('Failed to add announcement', ToastAndroid.SHORT);
-    }
-  };
-
-  const editAnnouncement = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      await axios.patch(`${API_URL}/posts/edit/${selectedAnnouncement._id}`, newAnnouncement, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchAnnouncements();
-      setModalVisible(false);
-      setSelectedAnnouncement(null);
-    } catch (error) {
-      console.error('Error editing announcement:', error);
-      ToastAndroid.show('Failed to edit announcement', ToastAndroid.SHORT);
-    }
-  };
-
-  const deleteAnnouncement = async (item) => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      await axios.delete(`${API_URL}/posts/delete/${item._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      fetchAnnouncements();
-    } catch (error) {
-      console.error('Error deleting announcement:', error);
-      ToastAndroid.show('Failed to delete announcement', ToastAndroid.SHORT);
     }
   };
 
@@ -177,7 +109,6 @@ export default function AdminHomeScreen() {
       await axios.post(`${API_URL}/notification/${id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // Removed fetchNotifications() from here
     } catch (error) {
       console.error('Error marking notification as read:', error);
       ToastAndroid.show('Failed to mark notification as read', ToastAndroid.SHORT);
@@ -200,13 +131,7 @@ export default function AdminHomeScreen() {
   const handleNotificationItemPress = async (notification) => {
     try {
       await markNotificationAsRead(notification._id);
-
-      const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.get(`${API_URL}/notification`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNotifications(response.data);
-
+      await fetchNotifications();
       setShowNotifications(false);
 
       switch (notification.documentType) {
@@ -233,9 +158,6 @@ export default function AdminHomeScreen() {
     }
   };
 
-
-
-
   const renderNotification = ({ item }) => (
     <Pressable
       style={[styles.notificationItem, item.isRead ? styles.readNotification : styles.unreadNotification]}
@@ -253,18 +175,12 @@ export default function AdminHomeScreen() {
       await axios.post(`${API_URL}/notification/mark-all-read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-
-      // Update the local state to reflect all notifications as read
       setNotifications(notifications.map(notif => ({ ...notif, isRead: true })));
-
       ToastAndroid.show('All notifications marked as read', ToastAndroid.SHORT);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
       ToastAndroid.show('Failed to mark all notifications as read', ToastAndroid.SHORT);
     }
-  };
-  const handleModalShow = async () => {
-    await fetchNotifications();
   };
 
   return (
@@ -272,7 +188,10 @@ export default function AdminHomeScreen() {
       <View style={styles.header}>
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeText}>Welcome,</Text>
-          <Pressable onPress={() => navigation.navigate('AdminProfileScreen')}>
+          <Pressable onPress={async () => {
+            const userId = await AsyncStorage.getItem('id');
+            navigation.navigate('StudentProfileScreen', { userId });
+          }}>
             <Text style={styles.usernameText}>{firstName}</Text>
           </Pressable>
         </View>
@@ -286,10 +205,7 @@ export default function AdminHomeScreen() {
             />
             {hasUnreadNotifications && <View style={styles.notificationBadge} />}
           </Pressable>
-          <Pressable onPress={async () => {
-            const userId = await AsyncStorage.getItem('id');
-            navigation.navigate('StudentProfileScreen', { userId });
-          }}>
+          <Pressable onPress={() => navigation.navigate('AdminProfileScreen')}>
             <Image
               source={profilePic ? { uri: profilePic } : require('../assets/default-profile-pic.png')}
               style={styles.profilePic}
@@ -306,54 +222,12 @@ export default function AdminHomeScreen() {
         />
       </View>
 
+      <AnnouncementList />
+
       <ExitDialog
         visible={showExitDialog}
         onCancel={handleCancelExit}
         onConfirm={handleConfirmExit}
-      />
-
-      <AnnouncementList
-        announcements={announcements}
-        isStudent={false}
-        onEditPress={(item) => {
-          setSelectedAnnouncement(item);
-          setNewAnnouncement({ title: item.title, description: item.content });
-          setModalVisible(true);
-        }}
-        onDeletePress={deleteAnnouncement}
-        onAddPress={() => {
-          setNewAnnouncement({ title: '', description: '' });
-          setModalVisible(true);
-        }}
-        onRefresh={() => {
-          setIsRefreshing(true);
-          fetchAnnouncements();
-        }}
-        refreshing={isRefreshing}
-      />
-
-      <FormModal
-        visible={modalVisible}
-        onClose={() => {
-          setModalVisible(false);
-          setSelectedAnnouncement(null);
-        }}
-        formFields={[
-          {
-            placeholder: 'Title',
-            value: newAnnouncement.title,
-            onChangeText: (text) => setNewAnnouncement({ ...newAnnouncement, title: text })
-          },
-          {
-            placeholder: 'Description',
-            value: newAnnouncement.description,
-            onChangeText: (text) => setNewAnnouncement({ ...newAnnouncement, description: text }),
-            isDescription: true
-          },
-        ]}
-        onSave={selectedAnnouncement ? editAnnouncement : addAnnouncement}
-        saveLabel={selectedAnnouncement ? "Update" : "Create"}
-        cancelLabel="Dismiss"
       />
 
       <Modal
@@ -361,7 +235,6 @@ export default function AdminHomeScreen() {
         transparent={true}
         visible={showNotifications}
         onRequestClose={() => setShowNotifications(false)}
-        onShow={handleModalShow}
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
@@ -541,6 +414,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 5,
   },
+  readAllButton: {
+    backgroundColor: Colors.cobaltblue,
+  },
   deleteAllButton: {
     backgroundColor: Colors.red,
   },
@@ -548,9 +424,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-  readAllButton: {
-    backgroundColor: Colors.cobaltblue,
-    marginRight: 10,
   },
 });
