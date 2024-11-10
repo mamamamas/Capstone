@@ -42,6 +42,7 @@
     "expo-updates": "^0.25.27",
     "google-auth-library": "^9.14.2",
     "jwt-decode": "^4.0.0",
+    "lucide-react": "^0.456.0",
     "lucide-react-native": "^0.454.0",
     "moment": "^2.30.1",
     "qs": "^6.13.0",

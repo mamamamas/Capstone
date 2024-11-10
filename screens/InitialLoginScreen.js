@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import ImageCarousel from './Components/ImageCarousel';
 import Colors from '../constants/Colors';
-
+import AntDesign from '@expo/vector-icons/AntDesign';
 const { height } = Dimensions.get('window');
 
 const images = [
@@ -130,9 +130,13 @@ const InitialLoginScreen = ({ navigation }) => {
           {loading ? (
             <ActivityIndicator color={Colors.cobaltblue} />
           ) : (
-            <Text style={[styles.buttonText, { color: 'black' }]}>Login with Google</Text>
+            <View style={styles.buttonContent}>
+              <AntDesign name="google" size={24} color="#4285F4" style={styles.googleIcon} />
+              <Text style={[styles.buttonText, { color: 'black' }]}>Login with Google</Text>
+            </View>
           )}
         </Pressable>
+        <Text style={[styles.buttonText, { color: Colors.white, marginBottom: 20 }]}>or</Text>
         <Pressable
           style={styles.button}
           onPress={() => navigation.navigate('Login')}
@@ -173,6 +177,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: '80%',
     alignItems: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  googleIcon: {
+    marginRight: 10,
   },
   buttonText: {
     color: Colors.white,

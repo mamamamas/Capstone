@@ -20,7 +20,7 @@ export default function AddStockModal({ visible, onClose, onAdd }) {
     setIsLoading(true);
     try {
       const token = await AsyncStorage.getItem('accessToken');
-      const response = await axios.post('http://192.168.1.15:3000/stocks/item', {
+      const response = await axios.post('http://192.168.1.9:3000/stocks/item', {
         addItemName: name,
         category,
       }, {
@@ -32,6 +32,7 @@ export default function AddStockModal({ visible, onClose, onAdd }) {
       );
 
       if (response.status === 200) {
+
         onAdd(response.data);
         onClose();
       } else {

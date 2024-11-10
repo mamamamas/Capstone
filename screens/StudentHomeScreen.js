@@ -22,7 +22,7 @@ import LogoutScreen from './TabScreens/LogoutScreen';
 import StudentProfileScreen from './StudentProfileScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import RefreshableScreen from '../app/Reloading';
+
 
 const Drawer = createDrawerNavigator();
 const Tab = createBottomTabNavigator();

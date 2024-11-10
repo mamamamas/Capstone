@@ -5,15 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Import your screens
 import LoginScreen from '../app/index';
-import RegisterScreen from '../app/registration';
-import DashboardScreen from '../app/user';
-import AdminDasboard from '../app/AdminDasboard';
-import AdminPostScreen from '../app/PostScreen';
-import ResetScreen from '../app/resetScreen';
 import AdminDrawer from '../navigation/AdminDrawer';
 import InitialLoginScreen from '../screens/InitialLoginScreen';
 import StudentHomeScreen from '../screens/StudentHomeScreen';
-import AddScreen from '../app/Add';
 import AppNavigator from '../navigation/AppNavigator'
 import StudentDetails from '../screens/Components/StudentDetails';
 import StudentProfile from '../screens/StudentProfileScreen';
@@ -23,6 +17,7 @@ import CreateAccount from '../screens/CreateAccountScreen';
 import ManageAccountScreen from '../screens/ManageAccountScreen';
 import AnnouncementList from '@/screens/Components/AnnouncementList';
 import StockScreen from '../screens/StockScreen';
+import StudentRecord from '../screens/TabScreens/StudentRecordScreen';
 const Stack = createNativeStackNavigator();
 
 export default function Main() {
@@ -100,17 +95,17 @@ export default function Main() {
         <Stack.Navigator initialRouteName={initialRoute}>
             <Stack.Screen name="InitialLogin" component={InitialLoginScreen} options={{ headerShown: false }} />
             <Stack.Screen name="AdminDasboard" component={AdminDrawer} options={{ headerShown: false }} />
-            <Stack.Screen name="user" component={DashboardScreen} options={{ headerShown: false }} />
+
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="registration" component={RegisterScreen} options={{ headerShown: false }} />
+
             <Stack.Screen name="StudentDetails" component={StudentDetails} options={{ headerShown: true }} />
-            <Stack.Screen name="Add" component={AddScreen} />
             <Stack.Screen name="StudentProfileScreen" component={StudentProfile} options={{ title: 'Student Profile', headerShown: true }} />
             <Stack.Screen name="AdminProfileScreen" component={AdminProfileScreen} options={{ title: 'AdminProfileScreen', headerShown: true }} />
             <Stack.Screen name="Create Account" component={CreateAccount} options={{ title: 'Create Account', headerShown: true }} />
             <Stack.Screen name="Manage Account" component={ManageAccountScreen} options={{ title: 'Manage Account', headerShown: true }} />
             <Stack.Screen name="AnnouncementList" component={AnnouncementList} options={{ title: 'AnnouncementList', headerShown: true }} />
             <Stack.Screen name="StockScreen" component={StockScreen} options={{ title: 'StockScreen', headerShown: true }} />
+            <Stack.Screen name="Student Record" component={StudentRecord} options={{ title: 'Student Record', headerShown: true }} />
             <Stack.Screen
                 name="AdminHome"
                 component={AdminDrawer}

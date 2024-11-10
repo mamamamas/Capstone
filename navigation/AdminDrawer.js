@@ -107,47 +107,25 @@ const AdminDrawer = () => {
             ),
           }}
         />
-        <Drawer.Screen
-          name="Archive"
-          component={ArchiveScreen}
-          options={{
-            drawerLabel: 'Archive',
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="archive-outline" size={size} color={color} />
-            ),
-          }}
-        />
 
-        {/* <Drawer.Screen
-        name="Inventory"
-        component={InventoryScreen}
-        options={{
-          drawerLabel: 'Inventory',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="folder-open-outline" size={size} color={color} />
-          ),
-        }}
-      /> */}
-        <Drawer.Screen
-          name="Student Record"
-          component={StudentRecordScreen}
-          options={{
-            drawerLabel: 'Student Record',
-            drawerIcon: ({ color, size }) => (
-              <Ionicons name="library-outline" size={size} color={color} />
-            ),
-          }}
-        />
+
+
+
         <Drawer.Screen
           name="Logout"
           component={LogoutScreen}
           options={{
             headerShown: false,
             drawerIcon: ({ color, size }) => (
-              <Ionicons name="exit-outline" size={size} color={color} />
+              <Ionicons name="exit-outline" size={size} color={color} style={{ marginTop: 33, color: "red" }} />
             ),
+            drawerLabelStyle: {
+              marginTop: 30,
+              color: "red"
+            },
           }}
         />
+
 
 
 

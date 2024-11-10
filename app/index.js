@@ -1,28 +1,42 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Image, TextInput, Alert, Linking } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, Pressable, StyleSheet, Image, TextInput, Alert, Linking, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-// import Realm from 'realm';
 import Colors from '../constants/Colors';
-// import { AppProvider, RealmProvider, useApp } from '@realm/react';
+import ImageCarousel from '../screens/Components/ImageCarousel';
+import * as Font from 'expo-font';
+const images = [
+    require('../assets/medpic2.png'),
+    require('../assets/medpic3.png'),
+    require('../assets/medpic4.png'),
+    require('../assets/medpic5.png'),
+    require('../assets/medpic6.png'),
+    require('../assets/medpic7.png'),
+    require('../assets/medpic8.png'),
+    require('../assets/medpic9.png'),
+    require('../assets/medpic10.png'),
+];
+const loopedImages = [...images, ...images, ...images, ...images];
 
 export default function AdminLoginScreen({ navigation }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    // const app = useApp();
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const [fontLoaded, setFontLoaded] = useState(false);
 
-    // const validationForm = () => {
-    //     let errors = {};
-    //     const emailRegex = /\S+@pcu.edu.ph$/;
+    useEffect(() => {
+        async function loadFont() {
+            await Font.loadAsync({
+                'pcufont': require('../assets/fonts/pcufont.ttf'),
+            });
+            setFontLoaded(true);
+        }
+        loadFont();
+    }, []);
 
-    //     if (!email) errors.email = "Email is required";
-    //     if (!password) errors.password = "Password is required";
-    //     if (!emailRegex.test(email))
-    //         errors.email = "Invalid email format. Please use your PCU email";
-
-    //     return Object.keys(errors).length === 0;
-    // };
-
+    if (!fontLoaded) {
+        return null; // Or a loading indicator
+    }
     const storeUserData = async (userData) => {
         try {
             const { id, accessToken, role, firstname, username, pfp } = userData;
@@ -76,65 +90,16 @@ export default function AdminLoginScreen({ navigation }) {
             setPassword('');
         }
     };
-    const handleGoogleLogin = async () => {
-        try {
-            // Open the Google login URL
-            Linking.openURL('https://d697-103-129-124-2.ngrok-free.app/auth/google');
-        } catch (error) {
-            console.error('Error during Google login:', error);
-            Alert.alert('Google Login Error', 'Unable to start Google login process.');
-        }
-    };
 
-    useEffect(() => {
-        const handleRedirect = async (event) => {
-            const url = event.url;
-            if (url && url.startsWith('https://d697-103-129-124-2.ngrok-free.app/auth/success')) {
-                try {
-                    // Extract token and googleId from the URL
-                    const urlParams = new URLSearchParams(url.split('?')[1]);
-                    const token = urlParams.get('token');
-                    const googleId = urlParams.get('googleId');
 
-                    if (token) {
-                        // Store both token and googleId (if available) simultaneously
-                        await Promise.all([
-                            AsyncStorage.setItem('accessToken', token),
-                            googleId ? AsyncStorage.setItem('googleId', googleId) : null,
-                        ]);
-
-                        // Navigate to the user dashboard
-                        navigation.navigate('user');
-                    } else {
-                        Alert.alert('Error', 'Failed to retrieve access token.');
-                    }
-                } catch (error) {
-                    console.error('Error handling redirect:', error);
-                    Alert.alert('Redirect Error', 'Failed to handle the redirect.');
-                }
-            }
-        };
-
-        // Add listener for incoming app URLs
-        const subscription = Linking.addListener('url', handleRedirect);
-
-        // Clean up the event listener on component unmount
-        return () => {
-            subscription.remove();
-        };
-    }, [navigation]);
 
     return (
         <View style={styles.loginContainer}>
+            <ImageCarousel images={loopedImages} scrollX={scrollX} blurRadius={10} />
+
             <View style={styles.container}>
-                <Image
-                    source={require('../assets/pcuLogo.png')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                />
-                <Text style={styles.Text}>
-                    Philippine Christian University
-                </Text>
+                <Image source={require('../assets/pcuLogo.png')} style={styles.logo} resizeMode="contain" />
+                <Text style={styles.Text}>Philippine Christian University</Text>
 
                 <Text style={styles.inputLabel}>Admin</Text>
                 <TextInput
@@ -162,11 +127,7 @@ export default function AdminLoginScreen({ navigation }) {
                     <Text style={styles.buttonText}>Login</Text>
                 </Pressable>
 
-                <Text style={[styles.buttonText, { color: Colors.white }]}>or</Text>
 
-                <Pressable style={[styles.button, { backgroundColor: Colors.cobaltblue, marginTop: 10 }]} onPress={handleGoogleLogin}>
-                    <Text style={[styles.buttonText, { color: Colors.white }]}>Login with Google</Text>
-                </Pressable>
             </View>
         </View>
     );
@@ -175,21 +136,20 @@ export default function AdminLoginScreen({ navigation }) {
 const styles = StyleSheet.create({
     loginContainer: {
         flex: 1,
-        backgroundColor: Colors.cobaltblue,
-        justifyContent: 'flex-end',
-        alignItems: 'center',
     },
     container: {
         borderTopLeftRadius: 70,
         borderTopRightRadius: 70,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(64, 64, 64, 0.7)',
+        backgroundColor: 'rgba(64, 64, 64, 0.9)',
         width: '100%',
         height: '90%',
+        position: 'absolute',
+        bottom: 0,
     },
     button: {
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.cobaltblue,
         padding: 10,
         marginHorizontal: 50,
         borderRadius: 10,
@@ -203,7 +163,7 @@ const styles = StyleSheet.create({
         height: '30%',
     },
     buttonText: {
-        color: Colors.black,
+        color: Colors.white,
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -217,18 +177,16 @@ const styles = StyleSheet.create({
         color: Colors.white,
         fontSize: 18,
         alignSelf: 'flex-start',
-        marginLeft: '10%',
-        marginBottom: 5,
+        marginLeft: 25,
+        marginTop: 15,
+        marginBottom: 10,
     },
     input: {
         backgroundColor: Colors.white,
-        color: Colors.black,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
         borderRadius: 10,
-        width: '80%',
+        height: 50,
+        width: '90%',
+        paddingHorizontal: 10,
         marginBottom: 20,
-        fontSize: 16,
-        alignSelf: 'center',
     },
 });

@@ -1,10 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet, Image, TextInput } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, Pressable, StyleSheet, Image, TextInput, Animated } from 'react-native';
 import Colors from '../constants/Colors';
+import ImageCarousel from './Components/ImageCarousel';
+
+const images = [
+  require('../assets/medpic2.png'),
+  require('../assets/medpic3.png'),
+  require('../assets/medpic4.png'),
+  require('../assets/medpic5.png'),
+  require('../assets/medpic6.png'),
+  require('../assets/medpic7.png'),
+  require('../assets/medpic8.png'),
+  require('../assets/medpic9.png'),
+  require('../assets/medpic10.png'),
+];
+const loopedImages = [...images, ...images, ...images, ...images];
 
 const AdminLoginScreen = ({ navigation }) => {
+  const scrollX = useRef(new Animated.Value(0)).current;
+
   const handleLogin = () => {
-    // Navigate to Admin Home Screen after login
     navigation.replace('AdminHome');
   };
 
@@ -13,14 +28,12 @@ const AdminLoginScreen = ({ navigation }) => {
 
   return (
     <View style={styles.loginContainer}>
+      {/* Pass blurRadius prop here */}
+      <ImageCarousel images={loopedImages} scrollX={scrollX} blurRadius={10} />
+
       <View style={styles.container}>
-        <Image source={require('../assets/pcuLogo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.Text}>
-          Philippine Christian University
-        </Text>
+        <Image source={require('../assets/pcuLogo.png')} style={styles.logo} resizeMode="contain" />
+        <Text style={styles.Text}>Philippine Christian University</Text>
 
         <Text style={styles.inputLabel}>Admin</Text>
         <TextInput
@@ -45,15 +58,17 @@ const AdminLoginScreen = ({ navigation }) => {
         />
 
         <Pressable style={[styles.button, { marginTop: 10 }]} onPress={handleLogin}>
-          <Text style={styles.buttonText}>login</Text>
+          <Text style={styles.buttonText}>Login</Text>
         </Pressable>
 
         <Text style={[styles.buttonText, { color: Colors.white }]}>or</Text>
 
-        <Pressable style={[styles.button, { backgroundColor: Colors.cobaltblue, marginTop: 10 }]} onPress={handleLogin}>
-          <Text style={[styles.buttonText, { color: Colors.white }]}>login with google</Text>
+        <Pressable
+          style={[styles.button, { backgroundColor: Colors.cobaltblue, marginTop: 10 }]}
+          onPress={handleLogin}
+        >
+          <Text style={[styles.buttonText, { color: Colors.white }]}>Login with Google</Text>
         </Pressable>
-
       </View>
     </View>
   );
@@ -62,18 +77,17 @@ const AdminLoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   loginContainer: {
     flex: 1,
-    backgroundColor: Colors.cobaltblue, // Use the correct color from Colors
-    justifyContent: 'flex-end',
-    alignItems: 'center',
   },
   container: {
-    borderTopLeftRadius: 70, // Top-left corner radius
+    borderTopLeftRadius: 70,
     borderTopRightRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(64, 64, 64, 0.7)',
+    backgroundColor: 'rgba(64, 64, 64, 0.9)',
     width: '100%',
     height: '90%',
+    position: 'absolute',
+    bottom: 0,
   },
   button: {
     backgroundColor: Colors.white,
@@ -85,8 +99,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: '30%', // Adjust this value to make the image smaller
-    aspectRatio: 1.5, // Adjust this value if needed to match the image's natural proportions
+    width: '30%',
+    aspectRatio: 1.5,
     height: '30%',
   },
   buttonText: {
@@ -104,22 +118,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 18,
     alignSelf: 'flex-start',
-    marginLeft: '10%',
-    marginBottom: 5,
-
+    marginLeft: 40,
+    marginTop: 20,
   },
   input: {
     backgroundColor: Colors.white,
-    color: Colors.black,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     borderRadius: 10,
-    width: '80%',
+    height: 50,
+    width: '90%',
+    paddingHorizontal: 10,
     marginBottom: 20,
-    fontSize: 16,
-    alignSelf: 'center',
   },
 });
-
 
 export default AdminLoginScreen;

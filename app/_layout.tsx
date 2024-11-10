@@ -4,7 +4,7 @@ import Main from '../app/main'; // This should be your navigation setup
 import { NavigationContainer } from '@react-navigation/native';
 import ErrorBoundary from './ErrorBoundary';
 // import retrieveUserData from './retrieveUserData';
-import RefreshableScreen from './Reloading';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 const App = () => {
     const appConfig = {
         id: "saulus-gneeuag",
@@ -17,8 +17,11 @@ const App = () => {
             {/* <AppProvider id={appConfig.id} baseUrl={appConfig.baseUrl}>
               <RealmProvider> */}
             <NavigationContainer independent={true}>
-                <Main />
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                    <Main />
+                </GestureHandlerRootView>
             </NavigationContainer>
+
             {/* </RealmProvider>
             </AppProvider> */}
         </ErrorBoundary>

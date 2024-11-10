@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { useNavigation } from '@react-navigation/native';
 import Colors from '../constants/Colors';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const chartConfig = {
   backgroundColor: '#fff',
   backgroundGradientFrom: '#fff',
@@ -40,10 +40,22 @@ const AdminProfileScreen = () => {
   const [pieChartData, setPieChartData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    fetchUserRole();
     fetchData();
   }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const role = await AsyncStorage.getItem('role');
+      console.log('User role:', role);
+      setIsAdmin(role === 'admin');
+    } catch (error) {
+      console.error('Error fetching user role:', error);
+    }
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -110,7 +122,7 @@ const AdminProfileScreen = () => {
   };
 
   const handlePressHealthRecords = () => {
-    navigation.navigate('StudentRecordScreen');
+    navigation.navigate('Student Record');
   };
 
   const handlePressCreateAccount = () => {
@@ -170,17 +182,21 @@ const AdminProfileScreen = () => {
             <Text style={pressableTextStyle}>Health Records</Text>
           </Pressable>
 
-          <Pressable onPress={handlePressCreateAccount} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
-            <Text style={pressableTextStyle}>Create Account</Text>
-          </Pressable>
+          {isAdmin && (
+            <Pressable onPress={handlePressCreateAccount} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
+              <Text style={pressableTextStyle}>Create Account</Text>
+            </Pressable>
+          )}
 
           <Pressable onPress={handlePressManageStock} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
             <Text style={pressableTextStyle}>Manage Stock</Text>
           </Pressable>
 
-          <Pressable onPress={handlePressManageAccounts} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
-            <Text style={pressableTextStyle}>Manage Accounts</Text>
-          </Pressable>
+          {isAdmin && (
+            <Pressable onPress={handlePressManageAccounts} style={[pressableStyle, { marginBottom: 10, width: '48%' }]}>
+              <Text style={pressableTextStyle}>Manage Accounts</Text>
+            </Pressable>
+          )}
         </View>
 
         <ChartTitle title="Top 5 Major Health Concerns" />

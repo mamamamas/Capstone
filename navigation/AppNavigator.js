@@ -6,7 +6,6 @@ import AdminLoginScreen from '../screens/AdminLoginScreen';
 import StudentLoginScreen from '../screens/StudentLoginScreen';
 import AdminDrawer from './AdminDrawer'; // Drawer navigator
 import StudentHomeScreen from '../screens/StudentHomeScreen';
-import retrieveUserData from '../app/retrieveUserData ';
 import DetailedRequestScreen from '../screens/DetailedRequestScreen'; // Add this import
 const Stack = createNativeStackNavigator();
 

@@ -4,7 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { Ionicons } from '@expo/vector-icons';
+import Colors from '../../constants/Colors';
 export default function EventsScreen() {
   const [events, setEvents] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -28,6 +29,9 @@ export default function EventsScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [attendanceState, setAttendanceState] = useState({});
+  const [attendeesModalVisible, setAttendeesModalVisible] = useState(false);
+  const [selectedEventAttendees, setSelectedEventAttendees] = useState([]);
+
 
 
   useEffect(() => {
@@ -45,6 +49,7 @@ export default function EventsScreen() {
           Authorization: `Bearer ${token}`,
         },
       });
+
       setEvents(response.data);
     } catch (error) {
       console.error("Error fetching events:", error);
@@ -66,11 +71,33 @@ export default function EventsScreen() {
       console.error("Error loading attendance state:", error);
     }
   };
+  const showAttendeesModal = (attendees) => {
+    setSelectedEventAttendees(attendees);
+    setAttendeesModalVisible(true);
+  };
+  useEffect(() => {
+    const loadAttendanceState = async () => {
+      const savedState = await AsyncStorage.getItem('attendanceState');
+      if (savedState) {
+        setAttendanceState(JSON.parse(savedState));
+      } else {
+        // Initialize attendance state based on current user data if AsyncStorage is empty
+        const initialState = {};
+        events.forEach(event => {
+          initialState[event._id] = event.attendees.includes(currentUserId);
+        });
+        setAttendanceState(initialState);
+      }
+    };
+
+    loadAttendanceState();
+  }, [events, currentUserId]);
+
 
   const fetchUserRole = async () => {
     try {
       const role = await AsyncStorage.getItem('role');
-      setIsAdmin(role === 'admin' || role === "staff"); // Set true only if the role is 'admin'
+      setIsAdmin(role === 'admin');
     } catch (error) {
       console.error('Error fetching user role:', error);
     }
@@ -83,39 +110,54 @@ export default function EventsScreen() {
     }
   };
 
+
   const toggleAttendance = async (eventId) => {
     const token = await AsyncStorage.getItem('accessToken');
-    try {
-      const response = await axios.post(`http://192.168.1.9:3000/event/${eventId}/attend`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const isCurrentlyAttending = attendanceState[eventId];
 
+    try {
+      // Send request to update attendance on the server
+      const response = await axios.post(
+        `http://192.168.1.9:3000/event/${eventId}/attend`,
+        { attend: !isCurrentlyAttending },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Toggle attendance state locally
       const newAttendanceState = {
         ...attendanceState,
-        [eventId]: !attendanceState[eventId]
+        [eventId]: !isCurrentlyAttending,
       };
-
       setAttendanceState(newAttendanceState);
-      await saveAttendanceState(newAttendanceState);
 
-      setEvents(events.map(event => {
-        if (event._id === eventId) {
-          const updatedAttendees = event.attendees || [];
-          if (updatedAttendees.includes(currentUserId)) {
-            return { ...event, attendees: updatedAttendees.filter(id => id !== currentUserId) };
-          } else {
-            return { ...event, attendees: [...updatedAttendees, currentUserId] };
+
+      setEvents((prevEvents) =>
+        prevEvents.map((event) => {
+          if (event._id === eventId) {
+            const updatedAttendees = isCurrentlyAttending
+              ? event.attendees.filter(id => id !== currentUserId)
+              : [...event.attendees, currentUserId];
+
+            return { ...event, attendees: updatedAttendees };
           }
-        }
-        return event;
-      }));
+          return event;
+        })
+      );
+
+      // Persist the new attendance state in AsyncStorage
+      await AsyncStorage.setItem('attendanceState', JSON.stringify(newAttendanceState));
 
       Alert.alert("Success", response.data.message);
     } catch (error) {
       console.error("Error toggling attendance:", error);
-      Alert.alert("Error", error.response?.data?.message || "Failed to update attendance. Please try again.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to update attendance. Please try again."
+      );
     }
   };
 
@@ -262,22 +304,55 @@ export default function EventsScreen() {
         <Text style={styles.detailText}>End: {new Date(event.when.endTime).toLocaleString()}</Text>
         <Text style={styles.detailText}>Where: {event.where}</Text>
         <Text style={styles.detailText}>Limit: {event.limit}</Text>
-        <Text style={styles.detailText}>Attendees: {event.attendees ? event.attendees.length : 0}</Text>
+        <TouchableOpacity onPress={() => showAttendeesModal(event.attendees)}>
+          <Text style={[styles.detailText, styles.clickableText]}>
+            Attendees: {event.attendees ? event.attendees.length : 0}
+          </Text>
+        </TouchableOpacity>
       </LinearGradient>
 
       <Text style={styles.aboutText}>About: {event.about}</Text>
 
-
-      <Pressable
-        style={attendanceState[event._id] ? styles.unattendButton : styles.attendButton}
-        onPress={() => toggleAttendance(event._id)}
-      >
-        <Text style={styles.attendText}>
-          {attendanceState[event._id] ? 'Uninterested' : 'Interested'}
-        </Text>
-      </Pressable>
-
+      {attendanceState && (
+        <Pressable
+          style={attendanceState[event._id] ? styles.unattendButton : styles.attendButton}
+          onPress={() => toggleAttendance(event._id)}
+        >
+          <Text style={styles.attendText}>
+            {attendanceState[event._id] ? 'Uninterested' : 'Interested'}
+          </Text>
+        </Pressable>
+      )}
     </View>
+  );
+
+  const renderAttendeesModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={attendeesModalVisible}
+      onRequestClose={() => setAttendeesModalVisible(false)}
+    >
+      <View style={styles.centeredView}>
+        <View style={styles.modalViews}>
+          <Text style={styles.modalTitlee}>Attendees</Text>
+          <ScrollView>
+            {selectedEventAttendees.map((attendee, index) => (
+              <View key={index} style={styles.attendeeItems}>
+                <Text style={styles.attendeeName}>{attendee.firstName} {attendee.lastName}</Text>
+                <Text style={styles.attendeeStatus}>{attendee.status}</Text>
+              </View>
+            ))}
+          </ScrollView>
+          <Pressable
+            style={[styles.buttonClose]}
+            onPress={() => setAttendeesModalVisible(false)}
+          >
+            <Text style={styles.textStyle}>Closes</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
   );
 
   const renderEventForm = () => (
@@ -287,169 +362,167 @@ export default function EventsScreen() {
       visible={modalVisible}
       onRequestClose={() => setModalVisible(false)}
     >
-      <View style={styles.modalView}>
-        <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
-          <Text style={styles.modalTitle}>{editingEvent ? 'Edit Event' : 'Add New Event'}</Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Title:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter title"
-              value={editingEvent ? editingEvent.title : newEvent.title}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, title: text }) : setNewEvent({ ...newEvent, title: text })}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Who:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter who"
-              value={editingEvent ? editingEvent.who : newEvent.who}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, who: text }) : setNewEvent({ ...newEvent, who: text })}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Start Date:</Text>
-            <TouchableOpacity onPress={() => setShowStartDatePicker(true)}>
-              <TextInput
-                style={styles.input}
-                placeholder="Select start date"
-                value={editingEvent ? new Date(editingEvent.when.startTime).toLocaleDateString() : newEvent.when.startTime.toLocaleDateString()}
-                editable={false}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Start Time:</Text>
-            <TouchableOpacity onPress={() => setShowStartTimePicker(true)}>
-              <TextInput
-                style={styles.input}
-                placeholder="Select start time"
-                value={editingEvent ? new Date(editingEvent.when.startTime).toLocaleTimeString() : newEvent.when.startTime.toLocaleTimeString()}
-                editable={false}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>End Date:</Text>
-            <TouchableOpacity onPress={() => setShowEndDatePicker(true)}>
-              <TextInput
-                style={styles.input}
-                placeholder="Select end date"
-                value={editingEvent ? new Date(editingEvent.when.endTime).toLocaleDateString() : newEvent.when.endTime.toLocaleDateString()}
-                editable={false}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>End Time:</Text>
-            <TouchableOpacity onPress={() => setShowEndTimePicker(true)}>
-              <TextInput
-                style={styles.input}
-                placeholder="Select end time"
-                value={editingEvent ? new Date(editingEvent.when.endTime).toLocaleTimeString() : newEvent.when.endTime.toLocaleTimeString()}
-                editable={false}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {showStartDatePicker && (
-            <DateTimePicker
-              value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
-            />
-          )}
-
-          {showStartTimePicker && (
-            <DateTimePicker
-              value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
-              mode="time"
-              is24Hour={true}
-              display="default"
-              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
-            />
-          )}
-
-          {showEndDatePicker && (
-            <DateTimePicker
-              value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
-            />
-          )}
-
-          {showEndTimePicker && (
-            <DateTimePicker
-              value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
-              mode="time"
-              is24Hour={true}
-              display="default"
-              onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
-            />
-          )}
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Where:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter location"
-              value={editingEvent ? editingEvent.where : newEvent.where}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, where: text }) : setNewEvent({ ...newEvent, where: text })}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Limit:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter limit"
-              value={editingEvent ? editingEvent.limit : newEvent.limit}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, limit: text }) : setNewEvent({ ...newEvent, limit: text })}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>About:</Text>
-            <TextInput
-              style={[styles.input, styles.multilineInput]}
-              placeholder="Enter description"
-              value={editingEvent ? editingEvent.about : newEvent.about}
-              onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, about: text }) : setNewEvent({ ...newEvent, about: text })}
-              multiline
-            />
-          </View>
-        </ScrollView>
-
-        <View style={styles.buttonContainer}>
-          <Pressable
-            style={[styles.button, styles.buttonSave]}
-            onPress={editingEvent ? editEvent : addEvent}
-          >
-            <Text style={styles.textStyle}>{editingEvent ? 'Save Changes' : 'Add Event'}</Text>
-          </Pressable>
-          <Pressable
-
-            style={[styles.button, styles.buttonCancel]}
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <TouchableOpacity
+            style={styles.closeButton}
             onPress={() => {
               setModalVisible(false);
               setEditingEvent(null);
             }}
           >
-            <Text style={styles.textStyle}>Cancel</Text>
-          </Pressable>
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>{editingEvent ? 'Edit Event' : 'Add New Event'}</Text>
+          <ScrollView style={styles.formScrollView} showsVerticalScrollIndicator={false}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Title</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter title"
+                value={editingEvent ? editingEvent.title : newEvent.title}
+                onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, title: text }) : setNewEvent({ ...newEvent, title: text })}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Who</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter who"
+                value={editingEvent ? editingEvent.who : newEvent.who}
+                onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, who: text }) : setNewEvent({ ...newEvent, who: text })}
+              />
+            </View>
+
+            <View style={styles.dateTimeContainer}>
+              <View style={styles.dateTimeInput}>
+                <Text style={styles.inputLabel}>Start Date</Text>
+                <TouchableOpacity style={styles.dateTimePicker} onPress={() => setShowStartDatePicker(true)}>
+                  <Text>{editingEvent ? new Date(editingEvent.when.startTime).toLocaleDateString() : newEvent.when.startTime.toLocaleDateString()}</Text>
+                  <Ionicons name="calendar-outline" size={24} style={{ color: Colors.cobaltblue }} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.dateTimeInput}>
+                <Text style={styles.inputLabel}>Start Time</Text>
+                <TouchableOpacity style={styles.dateTimePicker} onPress={() => setShowStartTimePicker(true)}>
+                  <Text>{editingEvent ? new Date(editingEvent.when.startTime).toLocaleTimeString() : newEvent.when.startTime.toLocaleTimeString()}</Text>
+                  <Ionicons name="time-outline" size={24} style={{ color: Colors.cobaltblue }} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.dateTimeContainer}>
+              <View style={styles.dateTimeInput}>
+                <Text style={styles.inputLabel}>End Date</Text>
+                <TouchableOpacity style={styles.dateTimePicker} onPress={() => setShowEndDatePicker(true)}>
+                  <Text>{editingEvent ? new Date(editingEvent.when.endTime).toLocaleDateString() : newEvent.when.endTime.toLocaleDateString()}</Text>
+                  <Ionicons name="calendar-outline" size={24} style={{ color: Colors.cobaltblue }} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.dateTimeInput}>
+                <Text style={styles.inputLabel}>End Time</Text>
+                <TouchableOpacity style={styles.dateTimePicker} onPress={() => setShowEndTimePicker(true)}>
+                  <Text>{editingEvent ? new Date(editingEvent.when.endTime).toLocaleTimeString() : newEvent.when.endTime.toLocaleTimeString()}</Text>
+                  <Ionicons name="time-outline" size={24} style={{ color: Colors.cobaltblue }} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {showStartDatePicker && (
+              <DateTimePicker
+                value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
+              />
+            )}
+
+            {showStartTimePicker && (
+              <DateTimePicker
+                value={editingEvent ? new Date(editingEvent.when.startTime) : newEvent.when.startTime}
+                mode="time"
+                is24Hour={true}
+                display="default"
+                onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'startTime')}
+              />
+            )}
+
+            {showEndDatePicker && (
+              <DateTimePicker
+                value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
+              />
+            )}
+
+            {showEndTimePicker && (
+              <DateTimePicker
+                value={editingEvent ? new Date(editingEvent.when.endTime) : newEvent.when.endTime}
+                mode="time"
+                is24Hour={true}
+                display="default"
+                onChange={(event, selectedDate) => handleDateTimeChange(event, selectedDate, 'endTime')}
+              />
+            )}
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Where</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter location"
+                value={editingEvent ? editingEvent.where : newEvent.where}
+                onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, where: text }) : setNewEvent({ ...newEvent, where: text })}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Limit</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter limit"
+                keyboardType="numeric"
+                value={editingEvent ? editingEvent.limit : newEvent.limit}
+                onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, limit: text }) : setNewEvent({ ...newEvent, limit: text })}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>About</Text>
+              <TextInput
+                style={[styles.input, styles.multilineInput]}
+                placeholder="Enter description"
+                value={editingEvent ? editingEvent.about : newEvent.about}
+                onChangeText={(text) => editingEvent ? setEditingEvent({ ...editingEvent, about: text }) : setNewEvent({ ...newEvent, about: text })}
+                multiline
+              />
+            </View>
+          </ScrollView>
+
+          <View style={styles.buttonContainer}>
+            <Pressable
+              style={[styles.button, styles.buttonSave]}
+              onPress={editingEvent ? editEvent : addEvent}
+            >
+              <Text style={styles.textStyle}>{editingEvent ? 'Save Changes' : 'Add Event'}</Text>
+            </Pressable>
+            <Pressable
+
+              style={[styles.button, styles.buttonCancel]}
+              onPress={() => {
+                setModalVisible(false);
+                setEditingEvent(null);
+              }}
+            >
+              <Text style={styles.textStyle}>Cancel</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
   );
+
 
   return (
     <ScrollView
@@ -465,9 +538,10 @@ export default function EventsScreen() {
           <Text style={styles.addButtonText}>Add Event</Text>
         </Pressable>
       )}
-
-      {events.map(renderEventCard)}
       {renderEventForm()}
+      {events.map(renderEventCard)}
+
+      {renderAttendeesModal()}
     </ScrollView>
   );
 }
@@ -562,10 +636,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalView: {
-    flex: 1,
     backgroundColor: 'white',
     borderRadius: 20,
-    padding: 35,
+    padding: 20,
+    width: '90%',
+    maxHeight: '90%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -573,36 +648,37 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
   formScrollView: {
-    flex: 1,
+    maxHeight: '80%',
   },
   modalTitle: {
-    marginBottom: 15,
-    textAlign: 'center',
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
   },
   inputContainer: {
-    width: '100%',
-    marginBottom: 15,
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
     marginBottom: 5,
     color: '#333',
+    fontWeight: '600',
   },
   input: {
-    height: 40,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    width: '100%',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
   },
   multilineInput: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
   },
   buttonContainer: {
@@ -611,21 +687,85 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
+    borderRadius: 10,
+    padding: 15,
     flex: 1,
     marginHorizontal: 5,
+    alignItems: 'center',
   },
   buttonSave: {
-    backgroundColor: '#2196F3',
+    backgroundColor: Colors.cobaltblue,
   },
   buttonCancel: {
-    backgroundColor: '#f44336',
+    backgroundColor: Colors.orange,
   },
   textStyle: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  clickableText: {
+    textDecorationLine: 'underline',
+  },
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  attendeeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
+  },
+  attendeeName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  attendeeStatus: {
+    fontSize: 14,
+    color: '#666',
+  },
+  buttonClose: {
+    backgroundColor: Colors.cobaltblue,
+    borderRadius: 20,
+    padding: 10,
+    paddingRight: 20,
+    paddingLeft: 20,
+    elevation: 2,
+    marginTop: 15,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 20,
+    top: 20,
+    zIndex: 1,
+  },
+  dateTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  dateTimeInput: {
+    flex: 1,
+    marginRight: 10,
+  },
+  dateTimePicker: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

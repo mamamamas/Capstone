@@ -46,15 +46,7 @@ const HomeTabs = () => {
         }}
       />
 
-      <Tab.Screen
-        name="notification"
-        component={notifScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="information-circle-outline" size={size} color={color} />
-          ),
-        }}
-      />
+
     </Tab.Navigator>
   );
 };

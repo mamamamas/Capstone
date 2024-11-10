@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, FlatList, StyleSheet, Pressable, Modal, Button, Alert, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons'; // Importing the icon library
+import { View, Text, TextInput, FlatList, StyleSheet, Pressable, Modal, Alert, TouchableOpacity, ScrollView } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from 'axios';
+import Colors from '../../constants/Colors';
 
 const StockList = ({
   stock,
@@ -11,18 +12,39 @@ const StockList = ({
   handleExpirationDateChange,
   calculateStockStatus,
   isEditing,
+  refreshStockData,
   setModalVisible,
   setSelectedStockItem,
 }) => {
   const [datePickerVisible, setDatePickerVisible] = useState(null);
   const [tempDate, setTempDate] = useState(null);
-
-  // Deduction modal states
   const [deductionModalVisible, setDeductionModalVisible] = useState(false);
   const [deductionAmount, setDeductionAmount] = useState('');
-  const [selectedItem, setSelectedItem] = useState(null); // Selected stock item for deduction
-  const [stockToDelete, setStockToDelete] = useState([]); // Track items to delete
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [stockToDelete, setStockToDelete] = useState([]);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedStockDetails, setSelectedStockDetails] = useState(null);
 
+  const InfoItem = ({ label, value }) => (
+    <View style={styles.infoItem}>
+      <Text style={styles.infoLabel}>{label}:</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+
+  const handleDateChange = (event, selectedDate) => {
+    const currentIndex = datePickerVisible;
+    setDatePickerVisible(null);
+    if (selectedDate && currentIndex !== null) {
+      handleExpirationDateChange(currentIndex, selectedDate.toISOString().split('T')[0]);
+    }
+  };
+
+  const handleRowPress = (item) => {
+    console.log("Selected item with details:", JSON.stringify(item, null, 2));
+    setSelectedStockDetails(item);
+    setDetailsModalVisible(true);
+  };
 
   const renderItem = ({ item, index }) => {
     const initialQuantity = item.initialQuantity || 0;
@@ -49,35 +71,25 @@ const StockList = ({
       setDatePickerVisible(index);
     };
 
-    const handleDateChange = (event, selectedDate) => {
-      setDatePickerVisible(null);
-      if (selectedDate) {
-        handleExpirationDateChange(index, selectedDate.toISOString().split('T')[0]);
-      }
-    };
     const handleDeleteStock = (stockItemId, index) => {
-      // Ask for confirmation before deletion
       Alert.alert(
         "Confirm Delete",
         "Are you sure you want to delete this stock item?",
         [
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
+          { text: "Cancel", style: "cancel" },
           {
             text: "Delete",
             onPress: async () => {
               try {
                 const token = await AsyncStorage.getItem('accessToken');
                 await axios.post('http://192.168.1.9:3000/stocks/edit', {
-                  stockDeletion: [{ stockItemId }], // Sending stockItemId for deletion
+                  stockDeletion: [{ stockItemId }],
                 }, {
                   headers: { Authorization: `Bearer ${token}` },
                 });
+                refreshStockData();
                 Alert.alert("Deleted", "Stock item deleted successfully.");
-                // Update local state to reflect deletion
-                setStockToDelete(prevStock => prevStock.filter((item, idx) => idx !== index)); // Remove item from the state
+                setStockToDelete(prevStock => prevStock.filter((item, idx) => idx !== index));
               } catch (error) {
                 console.error('Error deleting stock item:', error);
                 const errorMessage = error.response?.data?.error || 'Failed to delete stock item.';
@@ -96,32 +108,39 @@ const StockList = ({
     };
 
     return (
-      <View style={[styles.itemRow(isLowStock), isLowStock && { backgroundColor: statusColor === 'red' ? '#ffcccc' : '#fff' }]}>
-        <Text style={styles.productName}>{item.stockItemName}</Text>
-        {isEditing ? (
-          <TextInput
-            placeholder="Qty"
-            value={item.newQuantity || ''}
-            onChangeText={(value) => handleNewQuantityChange(index, value)}
-            keyboardType="numeric"
-            style={styles.textInput}
-          />
-        ) : (
-          <Text style={styles.textDisplay}>{item.totalCurrentQuantity || '0'}</Text>
-        )}
-        <Text style={[styles.statusText(isLowStock), { color: statusColor }]}>
-          {stockStatus}
-        </Text>
-        {isEditing ? (
-          <Pressable style={styles.deductButton} onPress={() => handleDeleteStock(item.stockItemId, index)}>
-            <Icon name="delete" size={25} color="red" />
-          </Pressable>
-        ) : (
-          <Pressable style={styles.deductButton} onPress={openDeductionModal}>
-            <Icon name="edit" size={25} color="blue" />
-          </Pressable>
-        )}
-      </View>
+      <TouchableOpacity onPress={() => handleRowPress(item)}>
+        <View style={[styles.itemRow(isLowStock), isLowStock && { backgroundColor: statusColor === 'red' ? '#ffcccc' : '#fff' }]}>
+          <Text style={styles.productName}>{item.stockItemName}</Text>
+          {isEditing ? (
+            <TextInput
+              placeholder="Qty"
+              value={item.newQuantity || ''}
+              onChangeText={(value) => handleNewQuantityChange(index, value)}
+              keyboardType="numeric"
+              style={styles.textInput}
+            />
+          ) : (
+            <Text style={styles.textDisplay}>{item.totalCurrentQuantity || '0'}</Text>
+          )}
+          {isEditing && (
+            <Pressable onPress={handleDatePress} style={styles.dateInput}>
+              <Text>{item.expirationDate || 'Set Date'}</Text>
+            </Pressable>
+          )}
+          <Text style={[styles.statusText(isLowStock), { color: statusColor }]}>
+            {stockStatus}
+          </Text>
+          {isEditing ? (
+            <Pressable style={styles.deductButton} onPress={() => handleDeleteStock(item.stockItemId, index)}>
+              <Icon name="delete" size={25} color="red" />
+            </Pressable>
+          ) : (
+            <Pressable style={styles.deductButton} onPress={openDeductionModal}>
+              <Icon name="remove-circle-outline" size={24} color="red" />
+            </Pressable>
+          )}
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -133,12 +152,11 @@ const StockList = ({
 
     try {
       const token = await AsyncStorage.getItem('accessToken');
-
       const response = await axios.post(
-        'http://192.168.1.9:3000/stocks/deduct', // Update with your backend URL
+        'http://192.168.1.9:3000/stocks/deduct',
         {
-          stockItemId: selectedItem.stockItemId, // Use the selected item for deduction
-          deduction: parseInt(deductionAmount),  // Convert to number
+          stockItemId: selectedItem.stockItemId,
+          deduction: parseInt(deductionAmount),
         },
         {
           headers: {
@@ -150,7 +168,7 @@ const StockList = ({
 
       if (response.status === 200) {
         Alert.alert('Success', 'Stock deduction applied successfully');
-        // Optionally, refresh the stock list or update the UI accordingly
+        refreshStockData();
       } else {
         Alert.alert('Error', 'Failed to apply stock deduction');
       }
@@ -159,8 +177,56 @@ const StockList = ({
       Alert.alert('Error', 'Failed to apply stock deduction');
     }
 
-    setDeductionModalVisible(false); // Close the modal after deduction
-    setDeductionAmount(''); // Clear the input
+    setDeductionModalVisible(false);
+    setDeductionAmount('');
+  };
+
+  const StockDetailsModal = ({ visible, onClose, stockDetails }) => {
+    if (!visible || !stockDetails) return null;
+
+    const sortedStockDetails = stockDetails.stockDetails
+      ? [...stockDetails.stockDetails].sort((a, b) => new Date(a.expirationDate) - new Date(b.expirationDate))
+      : [];
+
+    return (
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{stockDetails.stockItemName}</Text>
+            <ScrollView style={styles.scrollView}>
+              <View style={styles.infoSection}>
+                <InfoItem label="Total Current Quantity" value={stockDetails.totalCurrentQuantity} />
+                <InfoItem label="Category" value={stockDetails.category} />
+                <InfoItem label="Status" value={stockDetails.status} />
+              </View>
+              <Text style={styles.sectionTitle}>Stock Details:</Text>
+              {sortedStockDetails.length > 0 ? (
+                sortedStockDetails.map((detail, index) => (
+                  <View key={index} style={styles.detailItem}>
+                    <InfoItem label="Initial Quantity" value={detail.initialQuantity} />
+                    <InfoItem label="Current Quantity" value={detail.currentQuantity} />
+                    <InfoItem
+                      label="Expiration Date"
+                      value={new Date(detail.expirationDate).toLocaleDateString()}
+                    />
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No stock details available.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
   return (
@@ -176,33 +242,51 @@ const StockList = ({
         />
       )}
 
-      {/* Deduction Modal */}
+      {datePickerVisible !== null && (
+        <DateTimePicker
+          value={tempDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+
       <Modal
         visible={deductionModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setDeductionModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Deduct Stock</Text>
+        <View style={styles.modalOverlay}>
+          <View style={styles.deductionModalContent}>
+            <View style={styles.modalHeader}>
+              <Icon name="remove-circle-outline" size={24} color="red" />
+              <Text style={styles.deductionModalTitle}>Deduct Stock</Text>
+            </View>
             <TextInput
               placeholder="Enter deduction amount"
               keyboardType="numeric"
               value={deductionAmount}
-              onChangeText={(value) => setDeductionAmount(value)}
-              style={styles.textInput}
+              onChangeText={setDeductionAmount}
+              style={styles.deductionTextInput}
             />
-            <TouchableOpacity style={styles.button} onPress={handleDeduction}>
-              <Text style={styles.buttonText}>Deduct</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setDeductionModalVisible(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={[styles.deductionButton, styles.cancelButton]} onPress={() => setDeductionModalVisible(false)}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.deductionButton} onPress={handleDeduction}>
+                <Text style={styles.deductionButtonText}>Deduct</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
+      <StockDetailsModal
+        visible={detailsModalVisible}
+        onClose={() => setDetailsModalVisible(false)}
+        stockDetails={selectedStockDetails}
+      />
     </View>
   );
 };
@@ -216,6 +300,16 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     backgroundColor: isLowStock ? '#ffe6e6' : 'transparent',
   }),
+  dateInput: {
+    width: 120,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    padding: 15,
+    textAlign: 'center',
+    marginHorizontal: 5,
+    backgroundColor: '#f9f9f9',
+  },
   productName: {
     width: 120,
     fontSize: 14,
@@ -256,42 +350,152 @@ const styles = StyleSheet.create({
     color: 'gray',
     padding: 20,
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
+    width: '90%',
+    maxHeight: '80%',
     backgroundColor: '#fff',
-    padding: 20,
     borderRadius: 20,
-    elevation: 5,
+    padding: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: 'white',
+    marginBottom: 15,
     textAlign: 'center',
-    color: '#333',
-  },
-  button: {
-    backgroundColor: '#007BFF',
-    padding: 15,
+    backgroundColor: Colors.cobaltblue,
     borderRadius: 10,
-    alignItems: 'center',
-    marginVertical: 5,
+    padding: 10
   },
-  buttonText: {
-    color: '#fff',
+  scrollView: {
+    marginBottom: 20,
+  },
+  infoSection: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#555',
+    marginBottom: 10,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 16,
+    color: '#666',
+    flex: 1,
+  },
+  infoValue: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
+  detailItem: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  closeButton: {
+    backgroundColor: Colors.orange,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    alignSelf: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  deductionModalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  deductionModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 10,
+  },
+  deductionTextInput: {
+    width: '100%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  deductionButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 5,
+    backgroundColor: Colors.cobaltblue,
   },
   cancelButton: {
-    backgroundColor: '#ff4d4d',
+    backgroundColor: Colors.orange,
+  },
+  cancelButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  deductionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
